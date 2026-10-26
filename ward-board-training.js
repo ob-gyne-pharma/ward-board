@@ -119,6 +119,8 @@
       .wbt-video-card h3, .wbt-panel h3 { font-size:.95rem; margin:0 0 6px; }
       .wbt-video-card p, .wbt-panel p { font-size:.85rem; line-height:1.5; color:var(--ink-soft,#526170); }
       .wbt-video-card video { width:100%; display:block; background:#101820; border-radius:9px; aspect-ratio:16/9; margin:10px 0; }
+      /* Keep unavailable video players hidden; display:block otherwise overrides the HTML hidden attribute. */
+      .wbt-video-card video[hidden] { display:none !important; }
       .wbt-video-placeholder { aspect-ratio:16/9; border-radius:9px; background:var(--paper,#f2f5f7);
         display:flex; align-items:center; justify-content:center; text-align:center; padding:14px; color:var(--ink-soft,#526170); font-size:.84rem; }
       .wbt-field { display:grid; gap:5px; margin:12px 0; }
