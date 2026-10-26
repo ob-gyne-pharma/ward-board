@@ -91,10 +91,20 @@
   .room-group{
     grid-column:1 / -1; display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); gap:14px;
   }
-  .room-group-label{
-    grid-column:1/-1; font-size:0.72rem; font-weight:700; text-transform:uppercase;
-    letter-spacing:0.06em; color:var(--ink-soft); margin-top:6px;
+  .room-header-row{
+    grid-column:1/-1; display:flex; align-items:center; justify-content:space-between;
+    margin-top:8px; border-bottom:1px solid var(--line-soft); padding-bottom:4px;
   }
+  .room-group-label{
+    font-size:0.76rem; font-weight:700; text-transform:uppercase;
+    letter-spacing:0.06em; color:var(--ink-soft);
+  }
+  .add-bedb-btn{
+    font-size:0.7rem; padding:3px 8px; background:var(--line-soft); color:var(--ink-soft);
+    border:1px dashed var(--line); border-radius:4px; cursor:pointer; font-weight:600;
+  }
+  .add-bedb-btn:hover{background:var(--accent-soft); color:var(--accent); border-color:var(--accent);}
+
   .bed-card{
     background:var(--card); border:1px solid var(--line); border-radius:10px;
     overflow:hidden; display:flex; flex-direction:column; position:relative;
@@ -166,8 +176,6 @@
   }
   .history-entry .h-time{font-weight:700; color:var(--ink); font-size:0.75rem; display:flex; justify-content:space-between; gap:8px;}
   .history-entry .h-time .del{color:var(--red); cursor:pointer; font-weight:600; font-size:0.7rem;}
-  .history-entry .h-row{margin-top:3px;}
-  .history-entry .h-label{font-weight:700; color:var(--ink-soft); font-size:0.68rem; text-transform:uppercase;}
 
   /* Modal Overlays */
   .overlay{
@@ -230,7 +238,7 @@
 
   footer{text-align:center; padding:18px; color:var(--ink-soft); font-size:0.74rem;}
 
-  /* Print Views */
+  /* Print / Handover Summary Views */
   #summaryPrintView{ display:none; }
   .summary-page{ font-family:'Segoe UI', Arial, sans-serif; color:#111; padding:14px 18px; }
   .summary-header{ display:flex; justify-content:space-between; align-items:baseline; border-bottom:2px solid #222; padding-bottom:6px; margin-bottom:8px; }
@@ -275,7 +283,7 @@
   <div class="header-actions">
     <span id="clock"></span>
     <button class="btn-ghost btn-small" id="staffNameBtn">👤 Set name</button>
-    <button class="btn-ghost" id="exportSummaryBtn">Summary</button>
+    <button class="btn-ghost" id="exportSummaryBtn">Handover / Summary</button>
     <button class="btn-ghost" id="printBtn">Full Print</button>
   </div>
 </header>
@@ -440,9 +448,8 @@
 (function(){
   "use strict";
 
-  var STORAGE_KEY = "ward_board_v1";
-  var ROOMS_PER_WARD = 20;
-  var BEDS = ["A","B"];
+  var STORAGE_KEY = "ward_board_v2";
+  var ROOMS_PER_WARD = 24;
 
   var state = { wardOrder: [], wards: {} };
   var activeWardId = null;
@@ -465,7 +472,7 @@
       ["Ward A","Ward B","Ward C","Ward D","Ward E"].forEach(function(name){
         var id = uid();
         state.wardOrder.push(id);
-        state.wards[id] = { name: name, rooms: {} };
+        state.wards[id] = { name: name, rooms: {}, roomConfig: {} };
       });
     }
     activeWardId = state.wardOrder[0];
@@ -478,7 +485,9 @@
   }
 
   function currentWard(){
-    return state.wards[activeWardId] || state.wards[state.wardOrder[0]];
+    var w = state.wards[activeWardId] || state.wards[state.wardOrder[0]];
+    if(!w.roomConfig) w.roomConfig = {};
+    return w;
   }
 
   function bedKey(room, bed){ return room + bed; }
@@ -521,7 +530,7 @@
       var name = prompt("Name for new ward:", "Ward " + String.fromCharCode(65 + state.wardOrder.length));
       if(!name) return;
       var id = uid();
-      state.wards[id] = { name: name.trim(), rooms: {} };
+      state.wards[id] = { name: name.trim(), rooms: {}, roomConfig: {} };
       state.wardOrder.push(id);
       activeWardId = id;
       saveState(); render();
@@ -550,7 +559,9 @@
     var w = currentWard();
 
     for(var r=1; r<=ROOMS_PER_WARD; r++){
-      BEDS.forEach(function(bed){
+      var beds = ["A"];
+      if(w.roomConfig && w.roomConfig[r] && w.roomConfig[r].hasB) beds.push("B");
+      beds.forEach(function(bed){
         var p = w.rooms[bedKey(r, bed)] || null;
         if(p){
           occCount++;
@@ -575,11 +586,15 @@
     }
 
     for(var room=1; room<=ROOMS_PER_WARD; room++){
+      if(!w.roomConfig[room]) w.roomConfig[room] = { hasB: !!w.rooms[room+"B"] };
+      var activeBeds = ["A"];
+      if(w.roomConfig[room].hasB) activeBeds.push("B");
+
       var anyVisible = false;
       var groupWrap = document.createElement("div");
       groupWrap.className = "room-group";
 
-      BEDS.forEach(function(bed){
+      activeBeds.forEach(function(bed){
         var key = bedKey(room, bed);
         var patient = w.rooms[key] || null;
 
@@ -595,16 +610,47 @@
           if(unitQ || typeQ || activeAcuityFilter) return;
           if(query && (room+bed).toLowerCase().indexOf(query)===-1) return;
         }
-
         anyVisible = true;
         groupWrap.appendChild(renderBedCard(room, bed, patient));
       });
 
       if(anyVisible){
+        var headerRow = document.createElement("div");
+        headerRow.className = "room-header-row";
+        
         var label = document.createElement("div");
         label.className = "room-group-label";
         label.textContent = "Room " + room;
-        grid.appendChild(label);
+        headerRow.appendChild(label);
+
+        if(!w.roomConfig[room].hasB){
+          var addBBtn = document.createElement("button");
+          addBBtn.className = "add-bedb-btn";
+          addBBtn.textContent = "+ Add Bed B";
+          addBBtn.onclick = (function(rNum){
+            return function(){
+              w.roomConfig[rNum].hasB = true;
+              saveState(); render();
+            };
+          })(room);
+          headerRow.appendChild(addBBtn);
+        } else {
+          var removeBBtn = document.createElement("button");
+          removeBBtn.className = "add-bedb-btn";
+          removeBBtn.style.color = "var(--red)";
+          removeBBtn.textContent = "Remove Bed B";
+          removeBBtn.onclick = (function(rNum){
+            return function(){
+              if(w.rooms[rNum+"B"] && !confirm("Bed B is occupied. Remove it anyway?")) return;
+              w.rooms[rNum+"B"] = null;
+              w.roomConfig[rNum].hasB = false;
+              saveState(); render();
+            };
+          })(room);
+          headerRow.appendChild(removeBBtn);
+        }
+
+        grid.appendChild(headerRow);
         grid.appendChild(groupWrap);
       }
     }
@@ -881,13 +927,101 @@
     };
   }
 
-  /* Listeners & Init */
+  /* Handover / Summary Report Export */
+  function buildSummaryHtml(onlyWardId){
+    var html = '<div class="summary-page">';
+    var titleSuffix = onlyWardId ? (' — ' + escapeHtml(state.wards[onlyWardId].name)) : '';
+    html += '<div class="summary-header"><h1>'+escapeHtml(state.appTitle||"Ward Board")+' — Handover Summary'+titleSuffix+'</h1>' +
+      '<span class="meta">'+fmtTime(nowISO())+'</span></div>';
+
+    var wardIds = onlyWardId ? [onlyWardId] : state.wardOrder;
+
+    wardIds.forEach(function(wardId){
+      var w = state.wards[wardId];
+      if(!w || !w.rooms) return;
+      var rows = [];
+      for(var r=1; r<=ROOMS_PER_WARD; r++){
+        var beds = ["A"];
+        if(w.roomConfig && w.roomConfig[r] && w.roomConfig[r].hasB) beds.push("B");
+        beds.forEach(function(bed){
+          var p = w.rooms[bedKey(r,bed)];
+          if(p) rows.push({room:r, bed:bed, patient:p});
+        });
+      }
+      if(rows.length===0) return;
+
+      html += '<div class="summary-ward-block"><div class="summary-ward-title">'+escapeHtml(w.name)+' ('+rows.length+' patients)</div>';
+      html += '<table class="summary-table"><thead><tr>' +
+        '<th>Bed</th><th>Name</th><th>Type</th><th>Unit</th><th>Diagnosis</th><th>Situation / Plan</th><th>Next review</th>' +
+        '</tr></thead><tbody>';
+
+      rows.forEach(function(row){
+        var p = row.patient;
+        var lastEntry = p.history && p.history.length ? p.history[p.history.length-1] : null;
+        var situation = lastEntry ? lastEntry.situation : p.situation;
+        var plan = lastEntry ? lastEntry.plan : p.plan;
+        var nextReview = lastEntry && lastEntry.nextReview !== undefined ? lastEntry.nextReview : p.nextReview;
+        var combined = [situation, plan].filter(Boolean).join(" — ");
+
+        html += '<tr>' +
+          '<td class="bed-col"><span class="acuity-dot '+p.acuity+'"></span>'+row.room+row.bed+'</td>' +
+          '<td>'+escapeHtml(p.name||"—")+(p.age?(' <span style="color:#777;">'+escapeHtml(p.age)+'</span>'):'')+'</td>' +
+          '<td>'+TYPE_LABEL[p.type]+'</td>' +
+          '<td>'+escapeHtml(p.unit||"—")+'</td>' +
+          '<td>'+escapeHtml(p.diagnosis||"—")+'</td>' +
+          '<td>'+escapeHtml(combined||"—")+'</td>' +
+          '<td>'+escapeHtml(nextReview||"—")+'</td>' +
+          '</tr>';
+      });
+      html += '</tbody></table></div>';
+    });
+
+    html += '</div>';
+    return html;
+  }
+
+  function runSummaryPrint(onlyWardId){
+    var spv = document.getElementById("summaryPrintView");
+    if(spv) spv.innerHTML = buildSummaryHtml(onlyWardId);
+    document.body.classList.add("printing-summary");
+    window.print();
+    setTimeout(function(){ document.body.classList.remove("printing-summary"); }, 500);
+  }
+
+  var expSumBtn = document.getElementById("exportSummaryBtn");
+  if(expSumBtn){
+    expSumBtn.onclick = function(){
+      var currentName = currentWard().name;
+      var choice = confirm('Export Handover Summary:\n\nOK = Just "'+currentName+'" (current ward)\nCancel = All wards combined');
+      if(choice){ runSummaryPrint(activeWardId); }
+      else { runSummaryPrint(null); }
+    };
+  }
+
   var searchBox = document.getElementById("searchBox");
   var unitFilter = document.getElementById("unitFilter");
   var typeFilter = document.getElementById("typeFilter");
   if(searchBox) searchBox.addEventListener("input", render);
   if(unitFilter) unitFilter.addEventListener("change", render);
   if(typeFilter) typeFilter.addEventListener("change", render);
+
+  var printBtn = document.getElementById("printBtn");
+  if(printBtn){
+    printBtn.onclick = function(){
+      document.body.classList.add("printing-full");
+      window.print();
+      setTimeout(function(){ document.body.classList.remove("printing-full"); }, 500);
+    };
+  }
+
+  function tickClock(){
+    var el = document.getElementById("clock");
+    if(el){
+      el.textContent = new Date().toLocaleString([], {weekday:'short', hour:'2-digit', minute:'2-digit', day:'2-digit', month:'short'});
+    }
+  }
+  tickClock();
+  setInterval(tickClock, 1000*30);
 
   loadState();
   if(getStaffName() && staffBtn){ staffBtn.textContent = "👤 " + getStaffName(); }
