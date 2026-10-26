@@ -179,8 +179,8 @@ try {
         addBtn.onclick = function(){
           var name = prompt("Patient Name/Initials for " + room + bed + ":");
           if(name){
-            w = currentWard();
-            w.rooms[room + bed] = { name: name, type: "antenatal", acuity: "stable", diagnosis: "Test admission", admitted: new, history: [] };
+            var w = currentWard();
+            w.rooms[room + bed] = { name: name, type: "antenatal", acuity: "stable", diagnosis: "Test admission", admitted: new Date().toISOString(), history: [] };
             saveState();
             render();
           }
