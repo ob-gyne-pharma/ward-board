@@ -238,8 +238,8 @@
 
   footer{text-align:center; padding:18px; color:var(--ink-soft); font-size:0.74rem;}
 
-  /* Print / Handover Summary Views */
-  #summaryPrintView{ display:none; }
+  /* Print / Handover / Full Print Views */
+  #summaryPrintView, #fullPrintView{ display:none; }
   .summary-page{ font-family:'Segoe UI', Arial, sans-serif; color:#111; padding:14px 18px; }
   .summary-header{ display:flex; justify-content:space-between; align-items:baseline; border-bottom:2px solid #222; padding-bottom:6px; margin-bottom:8px; }
   .summary-header h1{font-size:15px; margin:0;}
@@ -251,18 +251,13 @@
   .acuity-dot{display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:4px;}
   .acuity-dot.urgent{background:#b3261e;} .acuity-dot.review{background:#a8620a;} .acuity-dot.stable{background:#1d5f9e;}
 
-  .single-patient-print{ display:none; font-family:'Segoe UI', Arial, sans-serif; color:#111; padding:16px 20px; }
-
   @media print{
     body.printing-summary #grid, body.printing-summary header, body.printing-summary .ward-tabs, body.printing-summary .toolbar, body.printing-summary footer{display:none !important;}
     body.printing-summary #summaryPrintView{display:block !important;}
-    body.printing-single #grid, body.printing-single header, body.printing-single .ward-tabs, body.printing-single .toolbar, body.printing-single footer{display:none !important;}
-    body.printing-single .single-patient-print{display:block !important;}
-    body.printing-full header, body.printing-full .ward-tabs, body.printing-full .toolbar, body.printing-full .bed-actions, body.printing-full footer{display:none !important;}
+
+    body.printing-full header, body.printing-full .ward-tabs, body.printing-full .toolbar, body.printing-full .bed-actions, body.printing-full footer, body.printing-full #grid{display:none !important;}
+    body.printing-full #fullPrintView{display:block !important;}
     body.printing-full{background:#fff; padding:0;}
-    body.printing-full #grid{display:block; padding:0;}
-    body.printing-full .bed-card{break-inside:avoid; margin-bottom:10px; border:1px solid #999;}
-    body.printing-full .bed-card.empty{display:none;}
   }
 
   @media (max-width:640px){
@@ -283,7 +278,7 @@
   <div class="header-actions">
     <span id="clock"></span>
     <button class="btn-ghost btn-small" id="staffNameBtn">👤 Set name</button>
-    <button class="btn-ghost" id="exportSummaryBtn">Handover / Summary</button>
+    <button class="btn-ghost" id="exportSummaryBtn">Handover Summary</button>
     <button class="btn-ghost" id="printBtn">Full Print</button>
   </div>
 </header>
@@ -442,7 +437,7 @@
 </div>
 
 <div id="summaryPrintView"></div>
-<div class="single-patient-print" id="singlePatientPrintView"></div>
+<div id="fullPrintView"></div>
 
 <script>
 (function(){
@@ -927,7 +922,7 @@
     };
   }
 
-  /* Handover / Summary Report Export */
+  /* Handover Summary Export */
   function buildSummaryHtml(onlyWardId){
     var html = '<div class="summary-page">';
     var titleSuffix = onlyWardId ? (' — ' + escapeHtml(state.wards[onlyWardId].name)) : '';
@@ -998,21 +993,63 @@
     };
   }
 
+  /* Full Print Generator (All 24 rooms & Beds A/B) */
+  function buildFullPrintHtml(){
+    var w = currentWard();
+    var html = '<div class="summary-page">';
+    html += '<div class="summary-header"><h1>'+escapeHtml(state.appTitle||"Ward Board")+' — ' + escapeHtml(w.name) + ' (Full Ward Board)</h1>' +
+      '<span class="meta">'+fmtTime(nowISO())+'</span></div>';
+
+    html += '<table class="summary-table"><thead><tr>' +
+      '<th>Room / Bed</th><th>Status / Patient</th><th>Type / Unit</th><th>Acuity</th><th>Diagnosis & Situation</th><th>Plan & Next Review</th>' +
+      '</tr></thead><tbody>';
+
+    for(var r=1; r<=ROOMS_PER_WARD; r++){
+      var beds = ["A"];
+      if(w.roomConfig && w.roomConfig[r] && w.roomConfig[r].hasB) beds.push("B");
+      beds.forEach(function(bed){
+        var key = bedKey(r, bed);
+        var p = w.rooms[key];
+        html += '<tr>';
+        html += '<td class="bed-col" style="font-size:11px;">Room ' + r + bed + '</td>';
+        if(p){
+          var lastEntry = p.history && p.history.length ? p.history[p.history.length-1] : null;
+          var situation = lastEntry ? lastEntry.situation : p.situation;
+          var plan = lastEntry ? lastEntry.plan : p.plan;
+          var nextReview = lastEntry && lastEntry.nextReview !== undefined ? lastEntry.nextReview : p.nextReview;
+          
+          html += '<td><strong>'+escapeHtml(p.name||"Unnamed")+'</strong>'+(p.age?' ('+escapeHtml(p.age)+')':'')+'</td>';
+          html += '<td>'+TYPE_LABEL[p.type]+(p.unit?' / Unit '+escapeHtml(p.unit):'')+'</td>';
+          html += '<td><span class="acuity-dot '+p.acuity+'"></span>'+ACUITY_LABEL[p.acuity]+'</td>';
+          html += '<td><strong>Dx:</strong> '+escapeHtml(p.diagnosis||"—")+'<br><strong>Sit:</strong> '+escapeHtml(situation||"—")+'</td>';
+          html += '<td><strong>Plan:</strong> '+escapeHtml(plan||"—")+(nextReview?'<br><strong>Review:</strong> '+escapeHtml(nextReview):'')+'</td>';
+        } else {
+          html += '<td colspan="5" style="color:#777; font-style:italic;">Empty Bed</td>';
+        }
+        html += '</tr>';
+      });
+    }
+    html += '</tbody></table></div>';
+    return html;
+  }
+
+  var printBtn = document.getElementById("printBtn");
+  if(printBtn){
+    printBtn.onclick = function(){
+      var fpv = document.getElementById("fullPrintView");
+      if(fpv) fpv.innerHTML = buildFullPrintHtml();
+      document.body.classList.add("printing-full");
+      window.print();
+      setTimeout(function(){ document.body.classList.remove("printing-full"); }, 500);
+    };
+  }
+
   var searchBox = document.getElementById("searchBox");
   var unitFilter = document.getElementById("unitFilter");
   var typeFilter = document.getElementById("typeFilter");
   if(searchBox) searchBox.addEventListener("input", render);
   if(unitFilter) unitFilter.addEventListener("change", render);
   if(typeFilter) typeFilter.addEventListener("change", render);
-
-  var printBtn = document.getElementById("printBtn");
-  if(printBtn){
-    printBtn.onclick = function(){
-      document.body.classList.add("printing-full");
-      window.print();
-      setTimeout(function(){ document.body.classList.remove("printing-full"); }, 500);
-    };
-  }
 
   function tickClock(){
     var el = document.getElementById("clock");
