@@ -149,7 +149,7 @@
     overlay.innerHTML = `
       <section class="wbt-modal">
         <header class="wbt-head">
-          <h2 id="wbtTitle">🎓 Ward Board Training Centre</h2>
+          <h2 id="wbtTitle">🎓 Ward Board Training &amp; Help</h2>
           <button type="button" class="wbt-close" id="wbtClose" aria-label="Exit training">Exit training ✕</button>
         </header>
         <div class="wbt-body">
@@ -279,14 +279,15 @@
 
   function renderStart() {
     return `<div class="wbt-panel">
-      <h3>Welcome to Ward Board Training</h3>
-      <p>Learn the application before using the shared demonstration board. Start with a short screen-recording tutorial, then practise in an isolated training exercise.</p>
+      <h3>Welcome to Ward Board Training &amp; Help</h3>
+      <p>This section is optional support for learning Ward Board. Use it when you are new to the system, want to practise a workflow, or need a reminder. It is not a clinical task and does not replace your hospital’s policies or clinical judgement.</p>
       <div class="wbt-grid">
-        <article class="wbt-video-card"><h3>▶ Watch</h3><p>Short screen recordings with voice-over, using the same interface you see in Ward Board.</p><button class="wbt-training-primary" data-wbt-open-tab="videos">Browse videos</button></article>
-        <article class="wbt-video-card"><h3>🖱 Practise</h3><p>Try a guided scenario with fictional patients. The exercise does not write to the live board.</p><button class="wbt-training-primary" data-wbt-open-tab="practice">Start practice</button></article>
-        <article class="wbt-video-card"><h3>📖 Quick help</h3><p>Find simple instructions for common tasks and understand the limitations of the prototype.</p><button class="wbt-training-primary" data-wbt-open-tab="help">Open quick help</button></article>
+        <article class="wbt-video-card"><h3>▶ Learn the basics</h3><p>See how the board is organised and how common features work. Video recordings will appear here as they are added.</p><button class="wbt-training-primary" data-wbt-open-tab="videos">View video tutorials</button></article>
+        <article class="wbt-video-card"><h3>🖱 Practise with a fictional case</h3><p>Walk through a sample workflow using fictional information. Practice is separate from normal ward work.</p><button class="wbt-training-primary" data-wbt-open-tab="practice">Start optional practice</button></article>
+        <article class="wbt-video-card"><h3>📖 Get help with a task</h3><p>Look up reminders for finding a patient, preparing a handover, and understanding prototype limitations.</p><button class="wbt-training-primary" data-wbt-open-tab="help">Open quick help</button></article>
       </div>
-      <p class="wbt-muted" style="margin-top:14px;">Suggested order: Getting started → Updating a patient → Handover → Guided practice. Allow approximately 10–15 minutes.</p>
+      <p class="wbt-muted" style="margin-top:14px;"><strong>How to use this section:</strong> Choose only what you need. New to Ward Board? Start with the basics. Need to rehearse a workflow? Try a fictional case. Forgot where to find something? Open Quick Help. You do not need to complete every exercise.</p>
+      <p class="wbt-muted">Training exercises are for familiarisation only. Use fictional data in practice and follow your hospital’s approved procedures for real ward work.</p>
     </div>`;
   }
 
@@ -382,7 +383,7 @@
       button.id = 'wbTrainingNavBtn';
       button.type = 'button';
       button.className = 'btn-ghost btn-small';
-      button.textContent = '🎓 Training';
+      button.textContent = '🎓 Training & Help';
       button.addEventListener('click', () => openTraining());
       const settings = document.getElementById('settingsBtn');
       headerActions.insertBefore(button, settings || null);
@@ -395,7 +396,7 @@
       button.id = 'wbTrainingBottomBtn';
       button.type = 'button';
       button.className = 'nav-btn';
-      button.innerHTML = '<span class="nav-icon">🎓</span>Training';
+      button.innerHTML = '<span class="nav-icon">🎓</span>Training & Help';
       button.addEventListener('click', () => openTraining());
       bottomNav.appendChild(button);
     }
@@ -408,10 +409,10 @@
       card.className = 'wb-training-card';
       card.innerHTML = `
         <h3>🎓 Training & Help</h3>
-        <p>Learn the Ward Board with short screen-recording videos and guided practice using fictional patients. Training exercises never update the shared ward.</p>
+        <p>Optional support for learning the Ward Board, practising workflows with fictional cases, or finding a reminder when you need one. This is not a clinical task.</p>
         <div class="wb-training-actions">
-          <button type="button" class="wb-training-primary" id="wbDashboardStartPractice">Start interactive demo</button>
-          <button type="button" class="wb-training-secondary" id="wbDashboardVideos">Watch tutorials</button>
+          <button type="button" class="wb-training-primary" id="wbDashboardStartPractice">Practise with a fictional case</button>
+          <button type="button" class="wb-training-secondary" id="wbDashboardVideos">View video tutorials</button>
         </div>`;
       dashboardBody.appendChild(card);
       card.querySelector('#wbDashboardStartPractice').addEventListener('click', () => openTraining('practice'));
@@ -436,7 +437,7 @@
       button.type = 'button';
       button.className = 'btn-ghost';
       button.style.cssText = 'width:100%;margin-top:10px;padding:11px;';
-      button.textContent = '🎓 Learn how to use Ward Board';
+      button.textContent = '🎓 Training & Help — learn Ward Board';
       button.addEventListener('click', () => openTraining());
       setupCard.appendChild(button);
     }
