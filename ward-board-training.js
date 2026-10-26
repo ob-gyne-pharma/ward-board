@@ -96,6 +96,7 @@
       .wb-training-primary, .wb-training-secondary { border-radius:10px; padding:10px 13px;
         font:inherit; font-weight:700; cursor:pointer; border:1px solid var(--line,#dbe3ea); }
       .wb-training-primary { background:var(--accent,#176b87); color:#fff; border-color:transparent; }
+      .wb-training-primary:disabled { opacity:.45; cursor:not-allowed; }
       .wb-training-secondary { background:var(--card,#fff); color:var(--ink,#17212b); }
       #wbTrainingOverlay { position:fixed; inset:0; z-index:9999; background:rgba(7,17,28,.72);
         display:none; align-items:center; justify-content:center; padding:16px; }
@@ -114,6 +115,10 @@
       .wbt-tab { border:1px solid var(--line,#dbe3ea); background:transparent; color:inherit;
         padding:9px 12px; border-radius:999px; cursor:pointer; font-weight:700; }
       .wbt-tab[aria-selected="true"] { background:var(--accent,#176b87); color:#fff; border-color:transparent; }
+      .wbt-help-toggle { width:100%; text-align:left; display:flex; justify-content:space-between; gap:10px; align-items:center; border:1px solid var(--line,#dbe3ea); border-radius:10px; padding:12px; background:var(--card,#fff); color:inherit; font:inherit; font-weight:700; cursor:pointer; }
+      .wbt-help-answer { padding:10px 12px; line-height:1.55; }
+      .wbt-video-walkthrough { margin-top:10px; }
+      .wbt-video-status { border-radius:9px; padding:9px 10px; background:#fff4d6; color:#6e4c00; font-size:.82rem; font-weight:700; }
       .wbt-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; }
       .wbt-video-card, .wbt-panel { border:1px solid var(--line,#dbe3ea); border-radius:13px; padding:13px; min-width:0; }
       .wbt-video-card h3, .wbt-panel h3 { font-size:.95rem; margin:0 0 6px; }
@@ -195,19 +200,26 @@
     document.body.style.overflow = '';
   }
 
+  const walkthroughs = [
+    ['Open the board', 'Open Ward Board and review the page headings before selecting a patient. Use the training/demo environment only.'],
+    ['Find the correct patient card', 'Use the available category, unit filter, or search field. Confirm the identifier and context before opening a card. Never use real patient details in a training exercise.'],
+    ['Review status and timing', 'Read the visible status and review-time indicators carefully. In this prototype, indicators are training aids and must not be treated as a clinical alarm or substitute for local escalation policy.'],
+    ['Prepare a handover', 'Use the handover function if available, then check the summary for missing tasks, review times, and important context before printing or copying.'],
+    ['Practise a simulated shift', 'Open Try it yourself and choose a fictional case. Complete each step, check the preview, and reset the exercise when finished. The practice module is separate from live ward actions.']
+  ];
+
   function renderVideos() {
-    return `<div class="wbt-grid">${videos.map((video, i) => `
+    return `<div class="wbt-panel">
+      <h3>Video tutorials</h3>
+      <p>The five screen-recording videos have <strong>not been supplied or uploaded yet</strong>, so video playback is not available. To avoid leaving you with empty placeholders, use the clickable written walkthroughs below now. When MP4 recordings are added to the listed paths, the video players will appear automatically.</p>
+      <div class="wbt-video-status">Videos pending: MP4 files still need to be created and uploaded.</div>
+    </div>
+    <div class="wbt-grid" style="margin-top:12px">${videos.map((video, i) => `
       <article class="wbt-video-card">
-        <h3>${esc(video.title)}</h3>
-        <span class="wbt-muted">${esc(video.duration)}</span>
+        <h3>${esc(video.title)}</h3><span class="wbt-muted">${esc(video.duration)} · Written walkthrough available</span>
         <p>${esc(video.description)}</p>
-        <div class="wbt-video-placeholder" data-video-placeholder="${i}">
-          Screen-recording video not added yet.<br>Place the MP4 at:<br><code>${esc(video.src)}</code>
-        </div>
-        <video controls playsinline preload="none" hidden data-video="${i}" aria-label="${esc(video.title)}">
-          <source src="${esc(video.src)}" type="video/mp4">
-          Your browser does not support HTML video.
-        </video>
+        <button type="button" class="wb-training-primary wbt-video-walkthrough" data-wbt-walkthrough="${i}" aria-expanded="false">Open step-by-step walkthrough ▾</button>
+        <div class="wbt-step wbt-muted" data-wbt-walkthrough-content="${i}" hidden>${esc(walkthroughs[i][0])}. ${esc(walkthroughs[i][1])}<p><strong>Video file path:</strong> <code>${esc(video.src)}</code></p></div>
       </article>`).join('')}</div>`;
   }
 
@@ -252,14 +264,14 @@
           <div class="wbt-muted">STEP ${state.step + 1} OF ${scenario.steps.length}</div>
           <h3>${esc(step.title)}</h3>
           <p>${esc(step.detail)}</p>
-          ${step.check === 'reviewed' ? `<button class="wbt-secondary" id="wbtReviewed">${state.reviewed ? '✓ Patient reviewed' : 'Mark patient reviewed'}</button>` : ''}
+          ${step.check === 'reviewed' ? `<button class="wb-training-secondary" id="wbtReviewed">${state.reviewed ? '✓ Patient reviewed' : 'Mark patient reviewed'}</button>` : ''}
           ${step.check === 'note' ? `<label class="wbt-field"><span>Practice note / handover summary</span><textarea id="wbtNote" rows="3" placeholder="Enter fictional training text only…">${esc(state.note)}</textarea></label>` : ''}
           ${step.check === 'reviewTime' ? `<label class="wbt-field"><span>Practice review time</span><select id="wbtReviewTime"><option value="">Choose a practice time</option><option ${state.reviewTime==='30 minutes'?'selected':''}>30 minutes</option><option ${state.reviewTime==='2 hours'?'selected':''}>2 hours</option><option ${state.reviewTime==='next round'?'selected':''}>Next round</option></select></label>` : ''}
           ${step.check === 'task' ? `<label class="wbt-field"><span>Outstanding practice task</span><select id="wbtTask"><option value="">Choose a fictional task</option><option ${state.task==='Review pending results'?'selected':''}>Review pending results</option><option ${state.task==='Recheck observations'?'selected':''}>Recheck observations</option><option ${state.task==='Confirm team review'?'selected':''}>Confirm team review</option></select></label>` : ''}
-          ${step.check === 'confirm' ? `<div class="wbt-preview">${esc(state.scenarioId === 'update' ? `DEMO-001 — Practice update\\nNote: ${state.note || '(not entered)'}\\nNext review: ${state.reviewTime || '(not selected)'}` : `DEMO-002 — Practice handover\\nSummary: ${state.note || '(not entered)'}\\nOutstanding task: ${state.task || '(not selected)'}`)}</div><p class="wbt-muted">This preview exists only in this page's memory. It is not sent to Firebase or stored in the browser.</p><button class="wbt-secondary" id="wbtConfirm">${state.confirm ? '✓ Practice confirmed' : 'Confirm practice summary'}</button>` : ''}
+          ${step.check === 'confirm' ? `<div class="wbt-preview">${esc(state.scenarioId === 'update' ? `DEMO-001 — Practice update\\nNote: ${state.note || '(not entered)'}\\nNext review: ${state.reviewTime || '(not selected)'}` : `DEMO-002 — Practice handover\\nSummary: ${state.note || '(not entered)'}\\nOutstanding task: ${state.task || '(not selected)'}`)}</div><p class="wbt-muted">This preview exists only in this page's memory. It is not sent to Firebase or stored in the browser.</p><button class="wb-training-secondary" id="wbtConfirm">${state.confirm ? '✓ Practice confirmed' : 'Confirm practice summary'}</button>` : ''}
           <div class="wb-training-actions" style="margin-top:12px;">
-            <button class="wbt-training-secondary" id="wbtReset">Reset exercise</button>
-            <button class="wbt-training-primary" id="wbtNext" ${stepDone(step.check) ? '' : 'disabled'}>${state.step === scenario.steps.length - 1 ? 'Finish exercise' : 'Complete step →'}</button>
+            <button class="wb-training-secondary" id="wbtReset">Reset exercise</button>
+            <button class="wb-training-primary" id="wbtNext" ${stepDone(step.check) ? '' : 'disabled'}>${state.step === scenario.steps.length - 1 ? 'Finish exercise' : 'Complete step →'}</button>
           </div>
           <p class="wbt-muted" id="wbtFeedback" aria-live="polite">${stepDone(step.check) ? 'Step complete. Continue when ready.' : 'Complete the action above to enable the next step.'}</p>
         </div>
@@ -267,13 +279,17 @@
   }
 
   function renderHelp() {
-    return `<div class="wbt-grid">
-      <article class="wbt-panel"><h3>🧭 Finding a patient</h3><p>Use the patient categories, unit filter and search field to locate a fictional training card.</p></article>
-      <article class="wbt-panel"><h3>📝 Updating progress</h3><p>Open the relevant card, use the progress/update control, enter a concise note and check the result.</p></article>
-      <article class="wbt-panel"><h3>📋 Handover</h3><p>Generate the handover, review it for omissions and use the print/copy controls as needed.</p></article>
-      <article class="wbt-panel"><h3>⚠️ Urgency and timers</h3><p>In this prototype, indicators and timers are training aids only. They are not a reliable clinical alarm system and must not replace local escalation policy.</p></article>
-      <article class="wbt-panel"><h3>🔄 Demo reset</h3><p>Training exercises reset only their own fictional state. They do not reset or modify the shared ward board.</p></article>
-      <article class="wbt-panel"><h3>🆘 Something is not working?</h3><p>Note the device, browser, action attempted and what happened. Do not include patient-identifiable information in feedback.</p></article>
+    const helpItems = [
+      ['🧭 Finding a patient', 'Use the patient categories, unit filter and search field if available. Check the patient identifier and context before opening a card. Practise only with fictional records.'],
+      ['📝 Updating progress', 'Open the relevant card and look for its update/progress control. Enter a concise note, check the displayed result, and follow your local policy for real clinical documentation.'],
+      ['📋 Preparing a handover', 'Open the handover function if available. Review the generated summary for missing information, outstanding tasks and review times before printing or copying.'],
+      ['⚠️ Urgency and timers', 'This prototype’s indicators and timers are training aids only. They are not a reliable clinical alarm system and must not replace hospital escalation policy or clinical judgement.'],
+      ['🔄 Resetting a practice exercise', 'Go to Try it yourself and press Reset exercise. This resets only the fictional exercise state in the open page; it is not a reset control for the shared ward board.'],
+      ['🆘 Something is not working?', 'Try closing and reopening Training & Help, then refresh the page. If a control still fails, note your device, browser, the exact button, and what happened. Do not include patient-identifiable information in feedback.']
+    ];
+    return `<div class="wbt-panel"><h3>Quick help</h3><p>Select any topic to expand its instructions. These help panels are interactive.</p>
+      <div class="wbt-help-list">${helpItems.map((item, i) => `<section style="margin:9px 0"><button type="button" class="wbt-help-toggle" data-wbt-help="${i}" aria-expanded="false"><span>${esc(item[0])}</span><span aria-hidden="true">＋</span></button><div class="wbt-help-answer" data-wbt-help-answer="${i}" hidden>${esc(item[1])}</div></section>`).join('')}</div>
+      <div class="wb-training-actions" style="margin-top:14px"><button type="button" class="wb-training-primary" data-wbt-open-tab="practice">Open guided practice</button><button type="button" class="wb-training-secondary" data-wbt-open-tab="videos">Open tutorials</button></div>
     </div>`;
   }
 
@@ -282,9 +298,9 @@
       <h3>Welcome to Ward Board Training &amp; Help</h3>
       <p>This section is optional support for learning Ward Board. Use it when you are new to the system, want to practise a workflow, or need a reminder. It is not a clinical task and does not replace your hospital’s policies or clinical judgement.</p>
       <div class="wbt-grid">
-        <article class="wbt-video-card"><h3>▶ Learn the basics</h3><p>See how the board is organised and how common features work. Video recordings will appear here as they are added.</p><button class="wbt-training-primary" data-wbt-open-tab="videos">View video tutorials</button></article>
-        <article class="wbt-video-card"><h3>🖱 Practise with a fictional case</h3><p>Walk through a sample workflow using fictional information. Practice is separate from normal ward work.</p><button class="wbt-training-primary" data-wbt-open-tab="practice">Start optional practice</button></article>
-        <article class="wbt-video-card"><h3>📖 Get help with a task</h3><p>Look up reminders for finding a patient, preparing a handover, and understanding prototype limitations.</p><button class="wbt-training-primary" data-wbt-open-tab="help">Open quick help</button></article>
+        <article class="wbt-video-card"><h3>▶ Learn the basics</h3><p>See how the board is organised and how common features work. Video recordings will appear here as they are added.</p><button class="wb-training-primary" data-wbt-open-tab="videos">View video tutorials</button></article>
+        <article class="wbt-video-card"><h3>🖱 Practise with a fictional case</h3><p>Walk through a sample workflow using fictional information. Practice is separate from normal ward work.</p><button class="wb-training-primary" data-wbt-open-tab="practice">Start optional practice</button></article>
+        <article class="wbt-video-card"><h3>📖 Get help with a task</h3><p>Look up reminders for finding a patient, preparing a handover, and understanding prototype limitations.</p><button class="wb-training-primary" data-wbt-open-tab="help">Open quick help</button></article>
       </div>
       <p class="wbt-muted" style="margin-top:14px;"><strong>How to use this section:</strong> Choose only what you need. New to Ward Board? Start with the basics. Need to rehearse a workflow? Try a fictional case. Forgot where to find something? Open Quick Help. You do not need to complete every exercise.</p>
       <p class="wbt-muted">Training exercises are for familiarisation only. Use fictional data in practice and follow your hospital’s approved procedures for real ward work.</p>
@@ -303,6 +319,26 @@
 
     content.querySelectorAll('[data-wbt-open-tab]').forEach(button => {
       button.addEventListener('click', () => { state.tab = button.dataset.wbtOpenTab; render(); });
+    });
+    content.querySelectorAll('[data-wbt-help]').forEach(button => {
+      button.addEventListener('click', () => {
+        const i = button.dataset.wbtHelp;
+        const answer = content.querySelector(`[data-wbt-help-answer="${i}"]`);
+        const expanded = button.getAttribute('aria-expanded') === 'true';
+        button.setAttribute('aria-expanded', String(!expanded));
+        button.querySelector('span:last-child').textContent = expanded ? '＋' : '−';
+        if (answer) answer.hidden = expanded;
+      });
+    });
+    content.querySelectorAll('[data-wbt-walkthrough]').forEach(button => {
+      button.addEventListener('click', () => {
+        const i = button.dataset.wbtWalkthrough;
+        const panel = content.querySelector(`[data-wbt-walkthrough-content="${i}"]`);
+        const expanded = button.getAttribute('aria-expanded') === 'true';
+        button.setAttribute('aria-expanded', String(!expanded));
+        button.textContent = expanded ? 'Open step-by-step walkthrough ▾' : 'Close walkthrough ▴';
+        if (panel) panel.hidden = expanded;
+      });
     });
 
     videos.forEach((video, i) => {
@@ -360,7 +396,7 @@
         render();
       } else {
         const content = document.getElementById('wbtContent');
-        content.innerHTML = `<div class="wbt-panel"><h3>✓ Practice completed</h3><p>You completed the ${esc(scenario.title.toLowerCase())} exercise using fictional data.</p><p class="wbt-muted">No patient records were changed and no training data was saved.</p><button class="wbt-training-primary" id="wbtAgain">Repeat exercise</button></div>`;
+        content.innerHTML = `<div class="wbt-panel"><h3>✓ Practice completed</h3><p>You completed the ${esc(scenario.title.toLowerCase())} exercise using fictional data.</p><p class="wbt-muted">No patient records were changed and no training data was saved.</p><button class="wb-training-primary" id="wbtAgain">Repeat exercise</button></div>`;
         content.querySelector('#wbtAgain').addEventListener('click', () => { resetExercise(); render(); });
       }
     });
