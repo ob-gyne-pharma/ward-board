@@ -714,11 +714,18 @@
       var raw = localStorage.getItem(STORAGE_KEY);
       if(raw){
         var parsed = JSON.parse(raw);
-        if(parsed && parsed.wards){ state = parsed; }
+        if(parsed && parsed.wards && parsed.wardOrder && parsed.wardOrder.length > 0){
+          state = parsed;
+        } else {
+          localStorage.removeItem(STORAGE_KEY);
+        }
       }
-    }catch(e){ console.warn("Could not load saved board", e); }
+    }catch(e){
+      console.warn("Resetting corrupt storage", e);
+      try{ localStorage.removeItem(STORAGE_KEY); }catch(err){}
+    }
 
-    if(!state.wardOrder || state.wardOrder.length === 0){
+    if(!state.wardOrder || state.wardOrder.length === 0 || !state.wards){
       state.wardOrder = [];
       state.wards = {};
       ["Ward A","Ward B","Ward C","Ward D","Ward E"].forEach(function(name){
@@ -727,10 +734,13 @@
         state.wards[id] = { name: name, rooms: {} };
       });
     }
-    activeWardId = state.wardOrder[0];
+    
+    if(!activeWardId || !state.wards[activeWardId]){
+      activeWardId = state.wardOrder[0];
+    }
 
     var titleEl = document.getElementById("appTitle");
-    if(state.appTitle){ titleEl.textContent = state.appTitle; }
+    if(titleEl && state.appTitle){ titleEl.textContent = state.appTitle; }
   }
 
   function getStaffName(){
@@ -745,22 +755,23 @@
     }
     return getStaffName();
   }
-  document.getElementById("staffNameBtn").onclick = function(){
-    ensureStaffName();
-    updateStaffNameBtn();
-  };
+  var staffBtn = document.getElementById("staffNameBtn");
+  if(staffBtn){
+    staffBtn.onclick = function(){
+      ensureStaffName();
+      updateStaffNameBtn();
+    };
+  }
   function updateStaffNameBtn(){
+    if(!staffBtn) return;
     var n = getStaffName();
-    document.getElementById("staffNameBtn").textContent = n ? ("👤 " + n) : "👤 Set name";
+    staffBtn.textContent = n ? ("👤 " + n) : "👤 Set name";
   }
 
   function saveState(){
     try{
       var serialized = JSON.stringify(state);
       localStorage.setItem(STORAGE_KEY, serialized);
-      if(localStorage.getItem(STORAGE_KEY) !== serialized){
-        throw new Error("Storage verification failed");
-      }
       return true;
     }catch(e){
       console.warn("Could not save board", e);
@@ -768,16 +779,26 @@
     }
   }
 
-  function currentWard(){ return state.wards[activeWardId]; }
+  function currentWard(){
+    if(!state || !state.wards || !activeWardId || !state.wards[activeWardId]){
+      if(state && state.wardOrder && state.wardOrder.length > 0){
+        activeWardId = state.wardOrder[0];
+      }
+    }
+    if(!state.wards[activeWardId]){
+      var id = uid();
+      state.wardOrder = [id];
+      state.wards = {};
+      state.wards[id] = { name: "Ward A", rooms: {} };
+      activeWardId = id;
+    }
+    if(!state.wards[activeWardId].rooms){
+      state.wards[activeWardId].rooms = {};
+    }
+    return state.wards[activeWardId];
+  }
 
   function bedKey(room, bed){ return room + bed; }
-
-  function getBed(room, bed){
-    var w = currentWard();
-    var key = bedKey(room, bed);
-    if(!(key in w.rooms)){ w.rooms[key] = null; }
-    return w.rooms[key];
-  }
 
   function nowISO(){ return new Date().toISOString(); }
   function fmtTime(iso){
@@ -808,9 +829,11 @@
   var wardTabsEl = document.getElementById("wardTabs");
 
   function renderWardTabs(){
+    if(!wardTabsEl) return;
     wardTabsEl.innerHTML = "";
     state.wardOrder.forEach(function(id){
       var w = state.wards[id];
+      if(!w) return;
       var tab = document.createElement("div");
       tab.className = "ward-tab" + (id===activeWardId ? " active" : "");
       tab.textContent = w.name;
@@ -876,15 +899,17 @@
   }
 
   var appTitleEl = document.getElementById("appTitle");
-  appTitleEl.addEventListener("blur", function(){
-    var t = appTitleEl.textContent.trim() || "Ward Board";
-    appTitleEl.textContent = t;
-    state.appTitle = t;
-    saveState();
-  });
-  appTitleEl.addEventListener("keydown", function(e){
-    if(e.key === "Enter"){ e.preventDefault(); appTitleEl.blur(); }
-  });
+  if(appTitleEl){
+    appTitleEl.addEventListener("blur", function(){
+      var t = appTitleEl.textContent.trim() || "Ward Board";
+      appTitleEl.textContent = t;
+      state.appTitle = t;
+      saveState();
+    });
+    appTitleEl.addEventListener("keydown", function(e){
+      if(e.key === "Enter"){ e.preventDefault(); appTitleEl.blur(); }
+    });
+  }
 
   /* ---------- Rendering ---------- */
 
@@ -898,10 +923,11 @@
   var ACUITY_LABEL = { stable:"Stable", review:"Needs Review", urgent:"Urgent" };
 
   function render(){
+    if(!grid) return;
     renderWardTabs();
-    var query = searchBox.value.trim().toLowerCase();
-    var unitQ = unitFilter.value;
-    var typeQ = typeFilter.value;
+    var query = searchBox ? searchBox.value.trim().toLowerCase() : "";
+    var unitQ = unitFilter ? unitFilter.value : "";
+    var typeQ = typeFilter ? typeFilter.value : "";
     grid.innerHTML = "";
 
     var occCount=0, urgentCount=0, reviewCount=0, stableCount=0;
@@ -920,15 +946,21 @@
       });
     }
 
-    statPills.innerHTML =
-      '<span class="pill occ">'+'<span class="n">'+occCount+'</span> occupied</span>' +
-      '<span class="pill urgent'+(activeAcuityFilter==="urgent"?" active":"")+'" id="pillUrgent"><span class="n">'+urgentCount+'</span> urgent</span>' +
-      '<span class="pill review'+(activeAcuityFilter==="review"?" active":"")+'" id="pillReview"><span class="n">'+reviewCount+'</span> needs review</span>' +
-      '<span class="pill stable'+(activeAcuityFilter==="stable"?" active":"")+'" id="pillStable"><span class="n">'+stableCount+'</span> stable</span>';
+    if(statPills){
+      statPills.innerHTML =
+        '<span class="pill occ">'+'<span class="n">'+occCount+'</span> occupied</span>' +
+        '<span class="pill urgent'+(activeAcuityFilter==="urgent"?" active":"")+'" id="pillUrgent"><span class="n">'+urgentCount+'</span> urgent</span>' +
+        '<span class="pill review'+(activeAcuityFilter==="review"?" active":"")+'" id="pillReview"><span class="n">'+reviewCount+'</span> needs review</span>' +
+        '<span class="pill stable'+(activeAcuityFilter==="stable"?" active":"")+'" id="pillStable"><span class="n">'+stableCount+'</span> stable</span>';
 
-    document.getElementById("pillUrgent").onclick = function(){ activeAcuityFilter = activeAcuityFilter==="urgent"?"":"urgent"; render(); };
-    document.getElementById("pillReview").onclick = function(){ activeAcuityFilter = activeAcuityFilter==="review"?"":"review"; render(); };
-    document.getElementById("pillStable").onclick = function(){ activeAcuityFilter = activeAcuityFilter==="stable"?"":"stable"; render(); };
+      var pUrgent = document.getElementById("pillUrgent");
+      var pReview = document.getElementById("pillReview");
+      var pStable = document.getElementById("pillStable");
+
+      if(pUrgent) pUrgent.onclick = function(){ activeAcuityFilter = activeAcuityFilter==="urgent"?"":"urgent"; render(); };
+      if(pReview) pReview.onclick = function(){ activeAcuityFilter = activeAcuityFilter==="review"?"":"review"; render(); };
+      if(pStable) pStable.onclick = function(){ activeAcuityFilter = activeAcuityFilter==="stable"?"":"stable"; render(); };
+    }
 
     for(var room=1; room<=ROOMS_PER_WARD; room++){
       var anyVisible = false;
@@ -1010,7 +1042,7 @@
       return card;
     }
 
-    var lastEntry = patient.history.length ? patient.history[patient.history.length-1] : null;
+    var lastEntry = patient.history && patient.history.length ? patient.history[patient.history.length-1] : null;
     var displaySituation = lastEntry ? lastEntry.situation : patient.situation;
     var displayPlan = lastEntry ? lastEntry.plan : patient.plan;
     var displayNextReview = lastEntry && lastEntry.nextReview !== undefined ? lastEntry.nextReview : patient.nextReview;
@@ -1054,7 +1086,7 @@
 
     body.innerHTML = html;
 
-    if(patient.history.length > 0){
+    if(patient.history && patient.history.length > 0){
       var toggle = document.createElement("button");
       toggle.className = "history-toggle";
       toggle.textContent = "▸ Show history ("+patient.history.length+")";
@@ -1144,9 +1176,12 @@
     document.querySelectorAll("#typeToggle .type-btn").forEach(function(btn){
       btn.classList.toggle("active", btn.dataset.type === type);
     });
-    document.getElementById("fieldsAntenatal").style.display = type==="antenatal" ? "block" : "none";
-    document.getElementById("fieldsPostnatal").style.display = type==="postnatal" ? "block" : "none";
-    document.getElementById("fieldsGynae").style.display = type==="gynae" ? "block" : "none";
+    var fa = document.getElementById("fieldsAntenatal");
+    var fp = document.getElementById("fieldsPostnatal");
+    var fg = document.getElementById("fieldsGynae");
+    if(fa) fa.style.display = type==="antenatal" ? "block" : "none";
+    if(fp) fp.style.display = type==="postnatal" ? "block" : "none";
+    if(fg) fg.style.display = type==="gynae" ? "block" : "none";
   }
   document.querySelectorAll("#typeToggle .type-btn").forEach(function(btn){
     btn.onclick = function(){ setTypeUI(btn.dataset.type); };
@@ -1164,97 +1199,113 @@
 
   function openPatientModal(room, bed, patient){
     currentBedForModal = {room:room, bed:bed};
-    document.getElementById("modalTitle").textContent = patient ? (room+bed+" — Edit Patient") : (room+bed+" — New Patient");
+    var mTitle = document.getElementById("modalTitle");
+    if(mTitle) mTitle.textContent = patient ? (room+bed+" — Edit Patient") : (room+bed+" — New Patient");
 
     setTypeUI(patient ? patient.type : "antenatal");
     setAcuityUI(patient ? patient.acuity : "stable");
 
-    document.getElementById("f_name").value = patient ? (patient.name||"") : "";
-    document.getElementById("f_age").value = patient ? (patient.age||"") : "";
-    document.getElementById("f_unit").value = patient ? (patient.unit||"") : "";
-    document.getElementById("f_diagnosis").value = patient ? (patient.diagnosis||"") : "";
-    document.getElementById("f_situation").value = patient ? (patient.situation||"") : "";
-    document.getElementById("f_plan").value = patient ? (patient.plan||"") : "";
-    document.getElementById("f_nextReview").value = patient ? (patient.nextReview||"") : "";
+    function setVal(id, val){ var el = document.getElementById(id); if(el) el.value = val || ""; }
 
-    document.getElementById("f_gestation").value = patient ? (patient.gestation||"") : "";
-    document.getElementById("f_indication").value = patient ? (patient.indication||"") : "";
-    document.getElementById("f_fetal").value = patient ? (patient.fetal||"") : "";
+    setVal("f_name", patient ? patient.name : "");
+    setVal("f_age", patient ? patient.age : "");
+    setVal("f_unit", patient ? patient.unit : "");
+    setVal("f_diagnosis", patient ? patient.diagnosis : "");
+    setVal("f_situation", patient ? patient.situation : "");
+    setVal("f_plan", patient ? patient.plan : "");
+    setVal("f_nextReview", patient ? patient.nextReview : "");
 
-    document.getElementById("f_modeDelivery").value = patient ? (patient.modeDelivery||"") : "";
-    document.getElementById("f_dayPostDelivery").value = patient ? (patient.dayPostDelivery||"") : "";
-    document.getElementById("f_baby").value = patient ? (patient.baby||"") : "";
-    document.getElementById("f_vte").value = patient ? (patient.vte||"") : "";
+    setVal("f_gestation", patient ? patient.gestation : "");
+    setVal("f_indication", patient ? patient.indication : "");
+    setVal("f_fetal", patient ? patient.fetal : "");
 
-    document.getElementById("f_procedure").value = patient ? (patient.procedure||"") : "";
-    document.getElementById("f_drains").value = patient ? (patient.drains||"") : "";
-    document.getElementById("f_mobilisation").value = patient ? (patient.mobilisation||"") : "";
-    document.getElementById("f_labs").value = patient ? (patient.labs||"") : "";
-    document.getElementById("f_radiology").value = patient ? (patient.radiology||"") : "";
-    document.getElementById("f_consults").value = patient ? (patient.consults||"") : "";
-    document.getElementById("f_futurePlan").value = patient ? (patient.futurePlan||"") : "";
+    setVal("f_modeDelivery", patient ? patient.modeDelivery : "");
+    setVal("f_dayPostDelivery", patient ? patient.dayPostDelivery : "");
+    setVal("f_baby", patient ? patient.baby : "");
+    setVal("f_vte", patient ? patient.vte : "");
+
+    setVal("f_procedure", patient ? patient.procedure : "");
+    setVal("f_drains", patient ? patient.drains : "");
+    setVal("f_mobilisation", patient ? patient.mobilisation : "");
+    setVal("f_labs", patient ? patient.labs : "");
+    setVal("f_radiology", patient ? patient.radiology : "");
+    setVal("f_consults", patient ? patient.consults : "");
+    setVal("f_futurePlan", patient ? patient.futurePlan : "");
 
     var saveError = document.getElementById("patientSaveError");
     if(saveError){ saveError.style.display = "none"; saveError.textContent = ""; }
-    patientOverlay.classList.add("show");
+    if(patientOverlay) patientOverlay.classList.add("show");
   }
-  function closePatientModal(){ patientOverlay.classList.remove("show"); currentBedForModal=null; }
+  function closePatientModal(){
+    if(patientOverlay) patientOverlay.classList.remove("show");
+    currentBedForModal = null;
+  }
 
-  document.getElementById("closePatientModal").onclick = closePatientModal;
-  document.getElementById("cancelPatientModal").onclick = closePatientModal;
-  patientOverlay.addEventListener("click", function(e){ if(e.target===patientOverlay) closePatientModal(); });
+  var cModalBtn = document.getElementById("closePatientModal");
+  var canModalBtn = document.getElementById("cancelPatientModal");
+  if(cModalBtn) cModalBtn.onclick = closePatientModal;
+  if(canModalBtn) canModalBtn.onclick = closePatientModal;
+  if(patientOverlay){
+    patientOverlay.addEventListener("click", function(e){ if(e.target===patientOverlay) closePatientModal(); });
+  }
 
-  document.getElementById("savePatientModal").onclick = function(){
-    if(!currentBedForModal) return;
-    var room = currentBedForModal.room, bed = currentBedForModal.bed;
-    var key = bedKey(room, bed);
-    var existing = currentWard().rooms[key];
+  var savePatBtn = document.getElementById("savePatientModal");
+  if(savePatBtn){
+    savePatBtn.onclick = function(){
+      if(!currentBedForModal) return;
+      var room = currentBedForModal.room, bed = currentBedForModal.bed;
+      var key = bedKey(room, bed);
+      var w = currentWard();
+      var existing = w.rooms[key];
 
-    var data = {
-      type: selectedType,
-      acuity: selectedAcuity,
-      name: document.getElementById("f_name").value.trim(),
-      age: document.getElementById("f_age").value.trim(),
-      unit: document.getElementById("f_unit").value,
-      diagnosis: document.getElementById("f_diagnosis").value.trim(),
-      situation: document.getElementById("f_situation").value.trim(),
-      plan: document.getElementById("f_plan").value.trim(),
-      nextReview: document.getElementById("f_nextReview").value.trim(),
+      function getVal(id){ var el = document.getElementById(id); return el ? el.value.trim() : ""; }
 
-      gestation: document.getElementById("f_gestation").value.trim(),
-      indication: document.getElementById("f_indication").value.trim(),
-      fetal: document.getElementById("f_fetal").value.trim(),
+      var data = {
+        type: selectedType,
+        acuity: selectedAcuity,
+        name: getVal("f_name"),
+        age: getVal("f_age"),
+        unit: getVal("f_unit"),
+        diagnosis: getVal("f_diagnosis"),
+        situation: getVal("f_situation"),
+        plan: getVal("f_plan"),
+        nextReview: getVal("f_nextReview"),
 
-      modeDelivery: document.getElementById("f_modeDelivery").value.trim(),
-      dayPostDelivery: document.getElementById("f_dayPostDelivery").value.trim(),
-      baby: document.getElementById("f_baby").value.trim(),
-      vte: document.getElementById("f_vte").value.trim(),
+        gestation: getVal("f_gestation"),
+        indication: getVal("f_indication"),
+        fetal: getVal("f_fetal"),
 
-      procedure: document.getElementById("f_procedure").value.trim(),
-      drains: document.getElementById("f_drains").value.trim(),
-      mobilisation: document.getElementById("f_mobilisation").value.trim(),
-      labs: document.getElementById("f_labs").value.trim(),
-      radiology: document.getElementById("f_radiology").value.trim(),
-      consults: document.getElementById("f_consults").value.trim(),
-      futurePlan: document.getElementById("f_futurePlan").value.trim(),
+        modeDelivery: getVal("f_modeDelivery"),
+        dayPostDelivery: getVal("f_dayPostDelivery"),
+        baby: getVal("f_baby"),
+        vte: getVal("f_vte"),
 
-      admitted: existing ? existing.admitted : nowISO(),
-      addedBy: existing ? existing.addedBy : (getStaffName() || "Unknown"),
-      history: existing ? existing.history : []
-    };
+        procedure: getVal("f_procedure"),
+        drains: getVal("f_drains"),
+        mobilisation: getVal("f_mobilisation"),
+        labs: getVal("f_labs"),
+        radiology: getVal("f_radiology"),
+        consults: getVal("f_consults"),
+        futurePlan: getVal("f_futurePlan"),
 
-    currentWard().rooms[key] = data;
-    if(!saveState()){
-      var saveError = document.getElementById("patientSaveError");
-      if(saveError){
-        saveError.textContent = "Storage restricted.";
-        saveError.style.display = "block";
+        admitted: existing ? existing.admitted : nowISO(),
+        addedBy: existing ? existing.addedBy : (getStaffName() || "Unknown"),
+        history: existing && existing.history ? existing.history : []
+      };
+
+      w.rooms[key] = data;
+      if(!saveState()){
+        var saveError = document.getElementById("patientSaveError");
+        if(saveError){
+          saveError.textContent = "Storage restricted.";
+          saveError.style.display = "block";
+        }
+        return;
       }
-      return;
-    }
-    closePatientModal();
-    render();
-  };
+      closePatientModal();
+      render();
+    };
+  }
 
   /* ---------- Progress Update Modal ---------- */
 
@@ -1274,139 +1325,94 @@
 
   function openProgressModal(room, bed){
     currentBedForProgress = {room:room, bed:bed};
-    var patient = getBed(room, bed);
-    document.getElementById("progressModalTitle").textContent = "Progress Update — " + room + bed;
-    var lastEntry = patient.history.length ? patient.history[patient.history.length-1] : null;
+    var patient = currentWard().rooms[bedKey(room, bed)];
+    var pTitle = document.getElementById("progressModalTitle");
+    if(pTitle) pTitle.textContent = "Progress Update — " + room + bed;
+    var lastEntry = patient.history && patient.history.length ? patient.history[patient.history.length-1] : null;
 
     setProgressAcuityUI(patient.acuity || "stable");
-    document.getElementById("p_situation").value = lastEntry ? lastEntry.situation : patient.situation || "";
-    document.getElementById("p_plan").value = lastEntry ? lastEntry.plan : patient.plan || "";
-    document.getElementById("p_nextReview").value = (lastEntry && lastEntry.nextReview!==undefined) ? lastEntry.nextReview : patient.nextReview || "";
+    var ps = document.getElementById("p_situation");
+    var pp = document.getElementById("p_plan");
+    var pn = document.getElementById("p_nextReview");
+    if(ps) ps.value = lastEntry ? lastEntry.situation : patient.situation || "";
+    if(pp) pp.value = lastEntry ? lastEntry.plan : patient.plan || "";
+    if(pn) pn.value = (lastEntry && lastEntry.nextReview!==undefined) ? lastEntry.nextReview : patient.nextReview || "";
 
     var lastTime = lastEntry ? lastEntry.time : patient.admitted;
-    document.getElementById("progressBanner").textContent = "Last recorded update: " + fmtTime(lastTime) + ". Log routine rounds or ad-hoc updates.";
+    var pBanner = document.getElementById("progressBanner");
+    if(pBanner) pBanner.textContent = "Last recorded update: " + fmtTime(lastTime) + ". Log routine rounds or ad-hoc updates.";
 
-    progressOverlay.classList.add("show");
-    document.getElementById("p_situation").focus();
+    if(progressOverlay) progressOverlay.classList.add("show");
+    if(ps) ps.focus();
   }
-  function closeProgressModal(){ progressOverlay.classList.remove("show"); currentBedForProgress=null; }
+  function closeProgressModal(){
+    if(progressOverlay) progressOverlay.classList.remove("show");
+    currentBedForProgress = null;
+  }
 
-  document.getElementById("closeProgressModal").onclick = closeProgressModal;
-  document.getElementById("cancelProgressModal").onclick = closeProgressModal;
-  progressOverlay.addEventListener("click", function(e){ if(e.target===progressOverlay) closeProgressModal(); });
+  var cProgBtn = document.getElementById("closeProgressModal");
+  var canProgBtn = document.getElementById("cancelProgressModal");
+  if(cProgBtn) cProgBtn.onclick = closeProgressModal;
+  if(canProgBtn) canProgBtn.onclick = closeProgressModal;
+  if(progressOverlay){
+    progressOverlay.addEventListener("click", function(e){ if(e.target===progressOverlay) closeProgressModal(); });
+  }
 
-  document.getElementById("saveProgressModal").onclick = function(){
-    if(!currentBedForProgress) return;
-    var room = currentBedForProgress.room, bed = currentBedForProgress.bed;
-    var patient = getBed(room, bed);
+  var saveProgBtn = document.getElementById("saveProgressModal");
+  if(saveProgBtn){
+    saveProgBtn.onclick = function(){
+      if(!currentBedForProgress) return;
+      var room = currentBedForProgress.room, bed = currentBedForProgress.bed;
+      var patient = currentWard().rooms[bedKey(room, bed)];
 
-    var staffName = getStaffName();
-    if(!staffName){
-      staffName = ensureStaffName();
-      updateStaffNameBtn();
+      var staffName = getStaffName();
       if(!staffName){
-        if(!confirm("No name set — save this update as \"Unknown\"?")) return;
-        staffName = "Unknown";
+        staffName = ensureStaffName();
+        updateStaffNameBtn();
+        if(!staffName){ staffName = "Unknown"; }
       }
-    }
 
-    var entry = {
-      time: nowISO(),
-      acuity: progressAcuity,
-      situation: document.getElementById("p_situation").value.trim(),
-      plan: document.getElementById("p_plan").value.trim(),
-      nextReview: document.getElementById("p_nextReview").value.trim(),
-      updatedBy: staffName
+      var ps = document.getElementById("p_situation");
+      var pp = document.getElementById("p_plan");
+      var pn = document.getElementById("p_nextReview");
+
+      var entry = {
+        time: nowISO(),
+        acuity: progressAcuity,
+        situation: ps ? ps.value.trim() : "",
+        plan: pp ? pp.value.trim() : "",
+        nextReview: pn ? pn.value.trim() : "",
+        updatedBy: staffName
+      };
+      patient.acuity = progressAcuity;
+      if(!patient.history) patient.history = [];
+      patient.history.push(entry);
+      saveState();
+      closeProgressModal();
+      render();
     };
-    patient.acuity = progressAcuity;
-    patient.history.push(entry);
-    saveState();
-    closeProgressModal();
-    render();
-  };
+  }
 
   /* ---------- References Modal ---------- */
 
   var refOverlay = document.getElementById("refOverlay");
-
   function openRefModal(patient){
-    document.getElementById("refQuery").value = patient && patient.diagnosis ? patient.diagnosis : "";
-    document.getElementById("refResults").innerHTML = "";
-    document.getElementById("refStepError").style.display = "none";
-    document.getElementById("refStepLoading").style.display = "none";
-    refOverlay.classList.add("show");
+    var rq = document.getElementById("refQuery");
+    if(rq) rq.value = patient && patient.diagnosis ? patient.diagnosis : "";
+    var rr = document.getElementById("refResults");
+    var rse = document.getElementById("refStepError");
+    var rsl = document.getElementById("refStepLoading");
+    if(rr) rr.innerHTML = "";
+    if(rse) rse.style.display = "none";
+    if(rsl) rsl.style.display = "none";
+    if(refOverlay) refOverlay.classList.add("show");
   }
-  document.getElementById("closeRefModal").onclick = function(){ refOverlay.classList.remove("show"); };
-  document.getElementById("closeRefModalBtn").onclick = function(){ refOverlay.classList.remove("show"); };
-  refOverlay.addEventListener("click", function(e){ if(e.target===refOverlay) refOverlay.classList.remove("show"); });
+  var cRef1 = document.getElementById("closeRefModal");
+  var cRef2 = document.getElementById("closeRefModalBtn");
+  if(cRef1) cRef1.onclick = function(){ if(refOverlay) refOverlay.classList.remove("show"); };
+  if(cRef2) cRef2.onclick = function(){ if(refOverlay) refOverlay.classList.remove("show"); };
 
-  document.getElementById("runRefSearch").onclick = function(){
-    var q = document.getElementById("refQuery").value.trim();
-    if(!q){ alert("Enter search terms first."); return; }
-
-    document.getElementById("refResults").innerHTML = "";
-    document.getElementById("refStepError").style.display = "none";
-    document.getElementById("refStepLoading").style.display = "block";
-
-    var prompt = "Find current clinical guideline / literature references for this obstetric or gynaecology topic: \"" + q + "\". " +
-      "Prefer RCOG, NICE, FSRH, WHO, BJOG, or other reputable sources. " +
-      "Return ONLY a JSON array (no markdown fences, no preamble), each item: {\"title\":\"...\",\"source\":\"...\",\"url\":\"...\"}. " +
-      "Maximum 6 items. Only include real, verifiable sources — do not invent URLs.";
-
-    fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-6",
-        max_tokens: 1200,
-        messages: [{ role: "user", content: prompt }],
-        tools: [{ type: "web_search_20250305", name: "web_search" }]
-      })
-    })
-    .then(function(res){
-      if(!res.ok) throw new Error("Request failed (" + res.status + ")");
-      return res.json();
-    })
-    .then(function(data){
-      var textBlock = "";
-      if(data && data.content){
-        data.content.forEach(function(item){ if(item.type==="text") textBlock += item.text; });
-      }
-      var cleaned = textBlock.replace(/```json/g,"").replace(/```/g,"").trim();
-      var jsonStart = cleaned.indexOf("[");
-      var jsonEnd = cleaned.lastIndexOf("]");
-      if(jsonStart === -1 || jsonEnd === -1) throw new Error("No structured results returned.");
-      var parsed = JSON.parse(cleaned.slice(jsonStart, jsonEnd+1));
-      showRefResults(parsed);
-    })
-    .catch(function(err){
-      document.getElementById("refStepLoading").style.display = "none";
-      document.getElementById("refStepError").style.display = "block";
-      document.getElementById("refErrorText").textContent = err && err.message ? err.message :
-        "Reference search isn't available right now.";
-    });
-  };
-
-  function showRefResults(items){
-    document.getElementById("refStepLoading").style.display = "none";
-    var wrap = document.getElementById("refResults");
-    wrap.innerHTML = "";
-    if(!items || items.length===0){
-      wrap.innerHTML = '<div style="color:var(--ink-soft); font-size:0.85rem;">No results found — try different search terms.</div>';
-      return;
-    }
-    items.forEach(function(item){
-      var div = document.createElement("div");
-      div.className = "ref-item";
-      div.innerHTML =
-        '<a href="'+escapeHtml(item.url||"#")+'" target="_blank" rel="noopener">'+escapeHtml(item.title||"Untitled")+'</a>' +
-        '<div class="ref-src">'+escapeHtml(item.source||"")+'</div>';
-      wrap.appendChild(div);
-    });
-  }
-
-  /* ---------- Compact Summary Export ---------- */
-
+  /* ---------- Export & Print ---------- */
   function buildSummaryHtml(onlyWardId){
     var html = '<div class="summary-page">';
     var titleSuffix = onlyWardId ? (' — ' + escapeHtml(state.wards[onlyWardId].name)) : '';
@@ -1417,6 +1423,7 @@
 
     wardIds.forEach(function(wardId){
       var w = state.wards[wardId];
+      if(!w || !w.rooms) return;
       var rows = [];
       for(var r=1; r<=ROOMS_PER_WARD; r++){
         BEDS.forEach(function(bed){
@@ -1433,7 +1440,7 @@
 
       rows.forEach(function(row){
         var p = row.patient;
-        var lastEntry = p.history.length ? p.history[p.history.length-1] : null;
+        var lastEntry = p.history && p.history.length ? p.history[p.history.length-1] : null;
         var situation = lastEntry ? lastEntry.situation : p.situation;
         var plan = lastEntry ? lastEntry.plan : p.plan;
         var nextReview = lastEntry && lastEntry.nextReview !== undefined ? lastEntry.nextReview : p.nextReview;
@@ -1457,25 +1464,25 @@
   }
 
   function runSummaryPrint(onlyWardId){
-    document.getElementById("summaryPrintView").innerHTML = buildSummaryHtml(onlyWardId);
+    var spv = document.getElementById("summaryPrintView");
+    if(spv) spv.innerHTML = buildSummaryHtml(onlyWardId);
     document.body.classList.add("printing-summary");
     window.print();
     setTimeout(function(){ document.body.classList.remove("printing-summary"); }, 500);
   }
 
-  document.getElementById("exportSummaryBtn").onclick = function(){
-    var currentName = currentWard().name;
-    var choice = confirm(
-      'Export summary:\n\nOK = Just "'+currentName+'" (current ward)\nCancel = All 5 wards combined'
-    );
-    if(choice){ runSummaryPrint(activeWardId); }
-    else { runSummaryPrint(null); }
-  };
-
-  /* ---------- Single Patient Export ---------- */
+  var expSumBtn = document.getElementById("exportSummaryBtn");
+  if(expSumBtn){
+    expSumBtn.onclick = function(){
+      var currentName = currentWard().name;
+      var choice = confirm('Export summary:\n\nOK = Just "'+currentName+'" (current ward)\nCancel = All wards combined');
+      if(choice){ runSummaryPrint(activeWardId); }
+      else { runSummaryPrint(null); }
+    };
+  }
 
   function buildSinglePatientHtml(room, bed, p){
-    var lastEntry = p.history.length ? p.history[p.history.length-1] : null;
+    var lastEntry = p.history && p.history.length ? p.history[p.history.length-1] : null;
     var situation = lastEntry ? lastEntry.situation : p.situation;
     var plan = lastEntry ? lastEntry.plan : p.plan;
     var nextReview = lastEntry && lastEntry.nextReview !== undefined ? lastEntry.nextReview : p.nextReview;
@@ -1492,111 +1499,44 @@
 
     html += field("Diagnosis / reason for admission", p.diagnosis);
     html += field("Current situation", situation);
-
-    if(p.type==="antenatal"){
-      html += field("Gestation", p.gestation);
-      html += field("Indication for admission", p.indication);
-      html += field("Fetal monitoring", p.fetal);
-    } else if(p.type==="postnatal"){
-      html += field("Mode of delivery", p.modeDelivery);
-      html += field("Day post-delivery", p.dayPostDelivery);
-      html += field("Baby / feeding", p.baby);
-      html += field("VTE prophylaxis", p.vte);
-    } else if(p.type==="gynae"){
-      html += field("Procedure / post-op day", p.procedure);
-      html += field("Drains / catheter", p.drains);
-      html += field("Mobilisation / PV bleeding", p.mobilisation);
-      html += field("Lab test results", p.labs);
-      html += field("Radiology results", p.radiology);
-      html += field("Other specialty consults", p.consults);
-      html += field("Future plan", p.futurePlan);
-    }
-
     html += field("Plan", plan);
     html += field("Next review", nextReview);
-
-    if(p.history.length){
-      html += '<div class="sp-field" style="margin-top:14px; border-top:1px solid #ccc; padding-top:8px;"><div class="sp-label">History</div></div>';
-      p.history.slice().reverse().forEach(function(entry){
-        html += '<div class="sp-field" style="margin-bottom:6px;">' +
-          '<div class="sp-label">'+fmtTime(entry.time)+' · '+ACUITY_LABEL[entry.acuity]+(entry.updatedBy?(' · '+escapeHtml(entry.updatedBy)):'')+'</div>' +
-          '<div class="sp-value">'+[entry.situation, entry.plan].filter(Boolean).map(escapeHtml).join(" — ")+
-          (entry.nextReview?(' | Next: '+escapeHtml(entry.nextReview)):'')+'</div></div>';
-      });
-    }
-
     return html;
   }
 
   function printSinglePatient(room, bed, patient){
-    document.getElementById("singlePatientPrintView").innerHTML = buildSinglePatientHtml(room, bed, patient);
+    var sppv = document.getElementById("singlePatientPrintView");
+    if(sppv) sppv.innerHTML = buildSinglePatientHtml(room, bed, patient);
     document.body.classList.add("printing-single");
     window.print();
     setTimeout(function(){ document.body.classList.remove("printing-single"); }, 500);
   }
 
-  searchBox.addEventListener("input", render);
-  unitFilter.addEventListener("change", render);
-  typeFilter.addEventListener("change", render);
-  document.getElementById("printBtn").onclick = function(){
-    document.body.classList.add("printing-full");
-    window.print();
-    setTimeout(function(){ document.body.classList.remove("printing-full"); }, 500);
-  };
+  if(searchBox) searchBox.addEventListener("input", render);
+  if(unitFilter) unitFilter.addEventListener("change", render);
+  if(typeFilter) typeFilter.addEventListener("change", render);
+
+  var printBtn = document.getElementById("printBtn");
+  if(printBtn){
+    printBtn.onclick = function(){
+      document.body.classList.add("printing-full");
+      window.print();
+      setTimeout(function(){ document.body.classList.remove("printing-full"); }, 500);
+    };
+  }
 
   function tickClock(){
     var el = document.getElementById("clock");
-    el.textContent = new Date().toLocaleString([], {weekday:'short', hour:'2-digit', minute:'2-digit', day:'2-digit', month:'short'});
+    if(el){
+      el.textContent = new Date().toLocaleString([], {weekday:'short', hour:'2-digit', minute:'2-digit', day:'2-digit', month:'short'});
+    }
   }
   tickClock();
   setInterval(tickClock, 1000*30);
 
-  document.addEventListener("keydown", function(e){
-    if(e.key==="Escape"){
-      closePatientModal(); closeProgressModal();
-      refOverlay.classList.remove("show");
-    }
-  });
-
   loadState();
   updateStaffNameBtn();
   render();
-
-  document.addEventListener("focusin", function(e){
-    var target = e.target;
-    if(!target || !target.matches || !target.matches("input, textarea, select")) return;
-    var overlay = target.closest(".overlay.show");
-    if(!overlay) return;
-    window.setTimeout(function(){
-      try{ target.scrollIntoView({block:"nearest", behavior:"auto"}); }catch(err){}
-    }, 180);
-  });
-
-  (function setupManifest(){
-    var iconSvg = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'>" +
-      "<rect width='192' height='192' rx='36' fill='%231a2430'/>" +
-      "<rect x='40' y='40' width='50' height='112' rx='8' fill='%230f6e5c'/>" +
-      "<rect x='102' y='40' width='50' height='112' rx='8' fill='%23335b52'/>" +
-      "</svg>";
-    var iconDataUri = "data:image/svg+xml," + encodeURIComponent(iconSvg.replace(/%23/g,"#"));
-    var manifest = {
-      name: (state.appTitle || "Ward Board"),
-      short_name: (state.appTitle || "Ward Board").slice(0,12),
-      start_url: ".",
-      display: "standalone",
-      background_color: "#0f1620",
-      theme_color: "#1a2430",
-      icons: [
-        { src: iconDataUri, sizes: "192x192", type: "image/svg+xml", purpose: "any maskable" },
-        { src: iconDataUri, sizes: "512x512", type: "image/svg+xml", purpose: "any maskable" }
-      ]
-    };
-    try{
-      var blob = new Blob([JSON.stringify(manifest)], {type:"application/manifest+json"});
-      var url = URL.createObjectURL(blob);
-      document.getElementById("manifestLink").setAttribute("href", url);
-    }catch(e){}
-  })();
 
 })();
 </script>
