@@ -479,7 +479,7 @@
 <div id="summaryPrintView"></div>
 <div id="fullPrintView"></div>
 
-<!-- Firebase Real-Time Sync Script with Visibility Wake-Up -->
+<!-- Firebase Real-Time Sync Script with Explicit European Database URL -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
   import { getDatabase, ref, set, onValue, goOnline, goOffline } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
@@ -495,7 +495,8 @@
   };
 
   const app = initializeApp(firebaseConfig);
-  const db = getDatabase(app);
+  // Explicitly pass the databaseURL for europe-west1
+  const db = getDatabase(app, firebaseConfig.databaseURL);
   const boardRef = ref(db, 'wardBoardState/v3');
 
   window.firebaseSync = {
