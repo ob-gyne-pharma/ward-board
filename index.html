@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>Ward Board</title>
+<title>Ward Board Live</title>
 <meta name="theme-color" content="#1a2430">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -301,9 +301,9 @@
   </div>
   <div class="header-actions">
     <span id="clock"></span>
+    <span id="cloudStatus" style="font-size:0.72rem; background:rgba(255,255,255,0.15); padding:3px 8px; border-radius:4px; color:#a2f2c8;">☁️ Connecting…</span>
     <button class="btn-ghost btn-small" id="staffNameBtn">👤 Set name</button>
     <button class="btn-ghost" id="exportSummaryBtn">Handover Summary</button>
-    <button class="btn-ghost" id="syncCodeBtn">🔄 Sync Code</button>
     <button class="btn-ghost" id="printBtn">Full Print</button>
   </div>
 </header>
@@ -479,6 +479,45 @@
 <div id="summaryPrintView"></div>
 <div id="fullPrintView"></div>
 
+<!-- Firebase Real-Time Sync Script -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyC7RoEpdCWOYfxnKyTykmhVV9xgnbeH3bE",
+    authDomain: "wardboard-e7035.firebaseapp.com",
+    databaseURL: "https://wardboard-e7035-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "wardboard-e7035",
+    storageBucket: "wardboard-e7035.firebasestorage.app",
+    messagingSenderId: "480376138159",
+    appId: "1:480376138159:web:b0b6fe7c43168b49bee75a"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+  const boardRef = ref(db, 'wardBoardState/v3');
+
+  window.firebaseSync = {
+    save: function(stateData) {
+      set(boardRef, stateData).catch(function(err){
+        console.warn("Firebase save error:", err);
+      });
+    },
+    listen: function(callback) {
+      onValue(boardRef, function(snapshot){
+        var val = snapshot.val();
+        callback(val);
+      });
+    }
+  };
+
+  var statusEl = document.getElementById("cloudStatus");
+  if(statusEl){
+    statusEl.textContent = "⚡ Live Cloud";
+  }
+</script>
+
 <script>
 (function(){
   "use strict";
@@ -489,8 +528,24 @@
   var state = { wardOrder: [], wards: {} };
   var activeWardId = null;
   var activeAcuityFilter = "";
+  var isRemoteUpdate = false;
 
   function uid(){ return 'w' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+
+  function initDefaultState(){
+    if(!state.wardOrder || state.wardOrder.length === 0){
+      state.wardOrder = [];
+      state.wards = {};
+      ["Ward A","Ward B","Ward C","Ward D","Ward E"].forEach(function(name){
+        var id = uid();
+        state.wardOrder.push(id);
+        state.wards[id] = { name: name, rooms: {}, roomConfig: {} };
+      });
+    }
+    if(!activeWardId || !state.wards[activeWardId]){
+      activeWardId = state.wardOrder[0];
+    }
+  }
 
   function loadState(){
     try{
@@ -501,22 +556,19 @@
       }
     }catch(e){ localStorage.removeItem(STORAGE_KEY); }
 
-    if(!state.wardOrder || state.wardOrder.length === 0){
-      state.wardOrder = [];
-      state.wards = {};
-      ["Ward A","Ward B","Ward C","Ward D","Ward E"].forEach(function(name){
-        var id = uid();
-        state.wardOrder.push(id);
-        state.wards[id] = { name: name, rooms: {}, roomConfig: {} };
-      });
-    }
-    activeWardId = state.wardOrder[0];
+    initDefaultState();
     var titleEl = document.getElementById("appTitle");
     if(titleEl && state.appTitle) titleEl.textContent = state.appTitle;
   }
 
   function saveState(){
-    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); return true; }catch(e){ return false; }
+    try{
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      if(!isRemoteUpdate && window.firebaseSync){
+        window.firebaseSync.save(state);
+      }
+      return true;
+    }catch(e){ return false; }
   }
 
   function currentWard(){
@@ -754,7 +806,6 @@
     html += '<div class="field"><label>Current situation</label><div class="value">'+(displaySituation?escapeHtml(displaySituation):'<span class="empty-val">Not recorded</span>')+'</div></div>';
     html += '<div class="field"><label>Plan</label><div class="value">'+(displayPlan?escapeHtml(displayPlan):'<span class="empty-val">Not recorded</span>')+'</div></div>';
     
-    // Checklist Badges
     var chk = patient.checklist || {};
     html += '<div class="checklist-display">' +
       '<span class="chk-badge '+(chk.vte?'checked':'')+'">✓ VTE</span>' +
@@ -1006,33 +1057,6 @@
     };
   }
 
-  /* Sync Code (Export/Import) */
-  var syncCodeBtn = document.getElementById("syncCodeBtn");
-  if(syncCodeBtn){
-    syncCodeBtn.onclick = function(){
-      var action = prompt("Shift-Change Sync:\n\nType 'export' to get code for your shift\nType 'import' to load code from incoming shift");
-      if(!action) return;
-      if(action.toLowerCase() === 'export'){
-        try {
-          var payload = btoa(unescape(encodeURIComponent(JSON.stringify(state))));
-          prompt("Copy this shift sync code and send it to incoming staff:", payload);
-        } catch(e){ alert("Export failed."); }
-      } else if(action.toLowerCase() === 'import'){
-        var code = prompt("Paste shift sync code here:");
-        if(!code) return;
-        try {
-          var decoded = JSON.parse(decodeURIComponent(escape(atob(code.trim()))));
-          if(decoded && decoded.wards){
-            state = decoded;
-            saveState();
-            render();
-            alert("Board successfully synced!");
-          } else { throw new Error(); }
-        } catch(e){ alert("Invalid sync code."); }
-      }
-    };
-  }
-
   /* Handover Summary Export */
   function buildSummaryHtml(onlyWardId){
     var html = '<div class="summary-page">';
@@ -1171,9 +1195,24 @@
   tickClock();
   setInterval(tickClock, 1000*30);
 
+  // Initialize and connect Firebase Real-Time Listener
   loadState();
   if(getStaffName() && staffBtn){ staffBtn.textContent = "👤 " + getStaffName(); }
   render();
+
+  if(window.firebaseSync){
+    window.firebaseSync.listen(function(remoteState){
+      if(remoteState && remoteState.wards){
+        isRemoteUpdate = true;
+        state = remoteState;
+        initDefaultState();
+        render();
+        isRemoteUpdate = false;
+        var statusEl = document.getElementById("cloudStatus");
+        if(statusEl) statusEl.textContent = "⚡ Live Sync Active";
+      }
+    });
+  }
 
 })();
 </script>
