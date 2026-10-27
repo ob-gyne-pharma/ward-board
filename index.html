@@ -294,7 +294,7 @@
   </div>
   <div class="header-actions">
     <span id="clock"></span>
-    <span id="cloudStatus" style="font-size:0.72rem; background:#293846; padding:3px 8px; border-radius:4px; color:#a2f2c8;">☁️ Connecting...</span>
+    <span id="cloudStatus" style="font-size:0.72rem; background:#293846; padding:3px 8px; border-radius:4px; color:#fbeae9;">☁️ Connecting...</span>
     <button class="btn-ghost btn-small" id="staffNameBtn">👤 Set name</button>
     <button class="btn-ghost" id="exportSummaryBtn">Handover Summary</button>
     <button class="btn-ghost" id="printBtn">Full Print</button>
@@ -472,7 +472,7 @@
 <div id="summaryPrintView"></div>
 <div id="fullPrintView"></div>
 
-<!-- Firebase Real-Time Sync Script with Empty-Database Handling -->
+<!-- Firebase Real-Time Database Sync Script with Explicit European URL -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
   import { getDatabase, ref, set, onValue, goOnline, goOffline } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
@@ -498,7 +498,10 @@
       save: function(stateData) {
         if(statusEl) statusEl.textContent = "📤 Saving...";
         set(boardRef, stateData).then(function(){
-          if(statusEl) statusEl.textContent = "⚡ Live Sync Active";
+          if(statusEl) {
+            statusEl.textContent = "⚡ Live Sync Active";
+            statusEl.style.color = "#a2f2c8";
+          }
         }).catch(function(err){
           console.error("Firebase save error:", err);
           if(statusEl) statusEl.textContent = "❌ Save Error";
@@ -506,13 +509,17 @@
       },
       listen: function(callback) {
         onValue(boardRef, function(snapshot){
-          var val = snapshot.val();
-          // As soon as Firebase responds, update status to active
-          if(statusEl) statusEl.textContent = "⚡ Live Sync Active";
-          callback(val);
+          if(statusEl) {
+            statusEl.textContent = "⚡ Live Sync Active";
+            statusEl.style.color = "#a2f2c8";
+          }
+          callback(snapshot.val());
         }, function(err){
           console.error("Firebase read error:", err);
-          if(statusEl) statusEl.textContent = "❌ Read Error";
+          if(statusEl) {
+            statusEl.textContent = "❌ DB Error";
+            statusEl.style.color = "#ffb3b3";
+          }
         });
       }
     };
@@ -527,7 +534,10 @@
 
   } catch(e) {
     console.error("Firebase init error:", e);
-    if(statusEl) statusEl.textContent = "❌ Init Error";
+    if(statusEl) {
+      statusEl.textContent = "❌ Init Error";
+      statusEl.style.color = "#ffb3b3";
+    }
   }
 </script>
 
@@ -1234,7 +1244,7 @@
   tickClock();
   setInterval(tickClock, 1000*30);
 
-  // Initialize and connect Firebase Real-Time Listener with empty database handling
+  // Initialize and connect Firebase Real-Time Listener
   loadState();
   if(getStaffName() && staffBtn){ staffBtn.textContent = "👤 " + getStaffName(); }
   render();
@@ -1249,7 +1259,6 @@
         render();
         isRemoteUpdate = false;
       } else {
-        // If database is empty, push initial state to cloud
         saveState();
       }
     });
