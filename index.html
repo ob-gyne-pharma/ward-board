@@ -7,6 +7,7 @@
 <meta name="theme-color" content="#1a2430">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Ward Board">
 <style>
   :root{
     --ink:#1a2430; --ink-soft:#4a5a68; --line:#d7dee3; --line-soft:#e9edf0;
@@ -16,6 +17,7 @@
     --empty-bar:#c7cfd4; font-size:16px;
   }
   *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
   html,body{margin:0;padding:0;}
   body{
     font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -61,6 +63,22 @@
   .ward-tab.active{background:var(--accent); color:#fff;}
   .ward-tab.add-ward{background:#fff; border:1px dashed var(--line); color:var(--ink-soft);}
 
+  /* Floor Map Quick-Nav Bar */
+  .floor-map-bar{
+    display:flex; gap:4px; padding:8px 20px; background:#eef2f5;
+    border-bottom:1px solid var(--line-soft); overflow-x:auto; -webkit-overflow-scrolling:touch;
+    align-items:center;
+  }
+  .floor-map-label{font-size:0.7rem; font-weight:700; text-transform:uppercase; color:var(--ink-soft); margin-right:6px; white-space:nowrap;}
+  .room-pill{
+    flex-shrink:0; width:28px; height:28px; border-radius:50%; font-size:0.7rem; font-weight:700;
+    display:flex; align-items:center; justify-content:center; background:#d7dee3; color:var(--ink-soft);
+    cursor:pointer; text-decoration:none; border:1.5px solid transparent;
+  }
+  .room-pill.occ-stable{background:var(--blue-soft); color:var(--blue); border-color:var(--blue);}
+  .room-pill.occ-review{background:var(--amber-soft); color:var(--amber); border-color:var(--amber);}
+  .room-pill.occ-urgent{background:var(--red-soft); color:var(--red); border-color:var(--red);}
+
   .toolbar{
     display:flex; align-items:center; justify-content:space-between;
     padding:12px 20px; gap:12px; flex-wrap:wrap; background:var(--card); border-bottom:1px solid var(--line-soft);
@@ -93,11 +111,11 @@
   }
   .room-header-row{
     grid-column:1/-1; display:flex; align-items:center; justify-content:space-between;
-    margin-top:8px; border-bottom:1px solid var(--line-soft); padding-bottom:4px;
+    margin-top:12px; border-bottom:1px solid var(--line-soft); padding-bottom:4px; scroll-margin-top:100px;
   }
   .room-group-label{
-    font-size:0.76rem; font-weight:700; text-transform:uppercase;
-    letter-spacing:0.06em; color:var(--ink-soft);
+    font-size:0.78rem; font-weight:700; text-transform:uppercase;
+    letter-spacing:0.06em; color:var(--ink);
   }
   .add-bedb-btn{
     font-size:0.7rem; padding:3px 8px; background:var(--line-soft); color:var(--ink-soft);
@@ -148,6 +166,10 @@
   .field .value{font-size:0.86rem; line-height:1.4; color:var(--ink); word-break:break-word; white-space:pre-wrap;}
   .field .value.empty-val{color:#aab4bb; font-style:italic;}
 
+  .checklist-display{display:flex; gap:6px; flex-wrap:wrap; margin-top:2px; font-size:0.7rem; color:var(--ink-soft);}
+  .chk-badge{background:var(--line-soft); padding:2px 6px; border-radius:4px; font-weight:600;}
+  .chk-badge.checked{background:var(--accent-soft); color:var(--accent);}
+
   .patient-name-row{display:flex; align-items:baseline; gap:8px; flex-wrap:wrap;}
   .patient-name-row .pname{font-weight:700; font-size:1.0rem;}
   .patient-name-row .meta{font-size:0.76rem; color:var(--ink-soft);}
@@ -175,7 +197,6 @@
     border-left:3px solid var(--line); padding:6px 10px; background:var(--paper); border-radius:0 6px 6px 0; font-size:0.8rem;
   }
   .history-entry .h-time{font-weight:700; color:var(--ink); font-size:0.75rem; display:flex; justify-content:space-between; gap:8px;}
-  .history-entry .h-time .del{color:var(--red); cursor:pointer; font-weight:600; font-size:0.7rem;}
 
   /* Modal Overlays */
   .overlay{
@@ -199,7 +220,7 @@
   }
   .modal-foot{
     padding:14px 20px; border-top:1px solid var(--line-soft);
-    display:flex; justify-content:flex-end; gap:10px; flex-wrap:wrap; background:#fff;
+    display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; background:#fff; align-items:center;
   }
 
   .form-field{display:flex; flex-direction:column; gap:5px;}
@@ -211,6 +232,10 @@
   .form-field textarea{min-height:52px;}
   .form-row{display:flex; gap:10px; flex-wrap:wrap;}
   .form-row .form-field{flex:1; min-width:140px;}
+
+  .checklist-grid{display:flex; gap:12px; flex-wrap:wrap; background:var(--paper); padding:12px; border-radius:8px; border:1px solid var(--line-soft);}
+  .checklist-item{display:flex; align-items:center; gap:6px; font-size:0.8rem; font-weight:600; cursor:pointer;}
+  .checklist-item input{width:18px; height:18px; accent-color:var(--accent); cursor:pointer;}
 
   .type-toggle{display:flex; gap:8px; flex-wrap:wrap;}
   .type-btn{
@@ -238,7 +263,7 @@
 
   footer{text-align:center; padding:18px; color:var(--ink-soft); font-size:0.74rem;}
 
-  /* Print / Handover / Full Print Views */
+  /* Print Views */
   #summaryPrintView, #fullPrintView{ display:none; }
   .summary-page{ font-family:'Segoe UI', Arial, sans-serif; color:#111; padding:14px 18px; }
   .summary-header{ display:flex; justify-content:space-between; align-items:baseline; border-bottom:2px solid #222; padding-bottom:6px; margin-bottom:8px; }
@@ -252,10 +277,9 @@
   .acuity-dot.urgent{background:#b3261e;} .acuity-dot.review{background:#a8620a;} .acuity-dot.stable{background:#1d5f9e;}
 
   @media print{
-    body.printing-summary #grid, body.printing-summary header, body.printing-summary .ward-tabs, body.printing-summary .toolbar, body.printing-summary footer{display:none !important;}
+    body.printing-summary #grid, body.printing-summary header, body.printing-summary .ward-tabs, body.printing-summary .floor-map-bar, body.printing-summary .toolbar, body.printing-summary footer{display:none !important;}
     body.printing-summary #summaryPrintView{display:block !important;}
-
-    body.printing-full header, body.printing-full .ward-tabs, body.printing-full .toolbar, body.printing-full .bed-actions, body.printing-full footer, body.printing-full #grid{display:none !important;}
+    body.printing-full header, body.printing-full .ward-tabs, body.printing-full .floor-map-bar, body.printing-full .toolbar, body.printing-full .bed-actions, body.printing-full footer, body.printing-full #grid{display:none !important;}
     body.printing-full #fullPrintView{display:block !important;}
     body.printing-full{background:#fff; padding:0;}
   }
@@ -279,11 +303,17 @@
     <span id="clock"></span>
     <button class="btn-ghost btn-small" id="staffNameBtn">👤 Set name</button>
     <button class="btn-ghost" id="exportSummaryBtn">Handover Summary</button>
+    <button class="btn-ghost" id="syncCodeBtn">🔄 Sync Code</button>
     <button class="btn-ghost" id="printBtn">Full Print</button>
   </div>
 </header>
 
 <div class="ward-tabs" id="wardTabs"></div>
+
+<!-- Floor Map Quick-Jump Bar -->
+<div class="floor-map-bar" id="floorMapBar">
+  <span class="floor-map-label">Quick Jump:</span>
+</div>
 
 <div class="toolbar">
   <div class="stat-pills" id="statPills"></div>
@@ -333,6 +363,16 @@
           <button type="button" class="acuity-btn stable" data-acuity="stable">Stable</button>
           <button type="button" class="acuity-btn review" data-acuity="review">Needs Review</button>
           <button type="button" class="acuity-btn urgent" data-acuity="urgent">Urgent</button>
+        </div>
+      </div>
+
+      <!-- Morning Round Safety Checklist -->
+      <div class="form-field">
+        <label>Morning Round Safety Checklist</label>
+        <div class="checklist-grid">
+          <label class="checklist-item"><input type="checkbox" id="chk_vte"> VTE Checked</label>
+          <label class="checklist-item"><input type="checkbox" id="chk_edd"> EDD / Gestation</label>
+          <label class="checklist-item"><input type="checkbox" id="chk_consult"> Consultant Updated</label>
         </div>
       </div>
 
@@ -443,7 +483,7 @@
 (function(){
   "use strict";
 
-  var STORAGE_KEY = "ward_board_v2";
+  var STORAGE_KEY = "ward_board_v3";
   var ROOMS_PER_WARD = 24;
 
   var state = { wardOrder: [], wards: {} };
@@ -533,11 +573,35 @@
     wardTabsEl.appendChild(addTab);
   }
 
+  /* Floor Map Bar */
+  function renderFloorMapBar(){
+    var bar = document.getElementById("floorMapBar");
+    if(!bar) return;
+    bar.innerHTML = '<span class="floor-map-label">Quick Jump:</span>';
+    var w = currentWard();
+
+    for(var r=1; r<=ROOMS_PER_WARD; r++){
+      var pill = document.createElement("a");
+      pill.className = "room-pill";
+      pill.textContent = r;
+      pill.href = "#room_" + r;
+
+      var pA = w.rooms[r+"A"];
+      var pB = w.rooms[r+"B"];
+      var targetP = pA || pB;
+      if(targetP){
+        pill.classList.add("occ-" + targetP.acuity);
+      }
+      bar.appendChild(pill);
+    }
+  }
+
   var TYPE_LABEL = { antenatal:"Antenatal", postnatal:"Postnatal", gynae:"Gynae" };
   var ACUITY_LABEL = { stable:"Stable", review:"Needs Review", urgent:"Urgent" };
 
   function render(){
     renderWardTabs();
+    renderFloorMapBar();
     var grid = document.getElementById("grid");
     if(!grid) return;
     grid.innerHTML = "";
@@ -612,6 +676,7 @@
       if(anyVisible){
         var headerRow = document.createElement("div");
         headerRow.className = "room-header-row";
+        headerRow.id = "room_" + room;
         
         var label = document.createElement("div");
         label.className = "room-group-label";
@@ -688,6 +753,15 @@
     html += '<div class="field"><label>Diagnosis</label><div class="value">'+(patient.diagnosis?escapeHtml(patient.diagnosis):'<span class="empty-val">Not recorded</span>')+'</div></div>';
     html += '<div class="field"><label>Current situation</label><div class="value">'+(displaySituation?escapeHtml(displaySituation):'<span class="empty-val">Not recorded</span>')+'</div></div>';
     html += '<div class="field"><label>Plan</label><div class="value">'+(displayPlan?escapeHtml(displayPlan):'<span class="empty-val">Not recorded</span>')+'</div></div>';
+    
+    // Checklist Badges
+    var chk = patient.checklist || {};
+    html += '<div class="checklist-display">' +
+      '<span class="chk-badge '+(chk.vte?'checked':'')+'">✓ VTE</span>' +
+      '<span class="chk-badge '+(chk.edd?'checked':'')+'">✓ EDD</span>' +
+      '<span class="chk-badge '+(chk.consult?'checked':'')+'">✓ Consultant</span>' +
+      '</div>';
+
     html += '<div class="admit-row"><span>Admitted '+fmtDateShort(patient.admitted)+' ('+daysSince(patient.admitted)+'d)</span><span>Updated '+fmtTimeShort(lastEntry?lastEntry.time:patient.admitted)+'</span></div>';
 
     body.innerHTML = html;
@@ -787,6 +861,11 @@
     setTypeUI(patient ? patient.type : "antenatal");
     setAcuityUI(patient ? patient.acuity : "stable");
 
+    var chk = patient && patient.checklist ? patient.checklist : {};
+    document.getElementById("chk_vte").checked = !!chk.vte;
+    document.getElementById("chk_edd").checked = !!chk.edd;
+    document.getElementById("chk_consult").checked = !!chk.consult;
+
     function setVal(id, v){ var el = document.getElementById(id); if(el) el.value = v || ""; }
     setVal("f_name", patient ? patient.name : "");
     setVal("f_age", patient ? patient.age : "");
@@ -830,6 +909,11 @@
       w.rooms[key] = {
         type: selectedType,
         acuity: selectedAcuity,
+        checklist: {
+          vte: document.getElementById("chk_vte").checked,
+          edd: document.getElementById("chk_edd").checked,
+          consult: document.getElementById("chk_consult").checked
+        },
         name: getVal("f_name"),
         age: getVal("f_age"),
         unit: getVal("f_unit"),
@@ -922,6 +1006,33 @@
     };
   }
 
+  /* Sync Code (Export/Import) */
+  var syncCodeBtn = document.getElementById("syncCodeBtn");
+  if(syncCodeBtn){
+    syncCodeBtn.onclick = function(){
+      var action = prompt("Shift-Change Sync:\n\nType 'export' to get code for your shift\nType 'import' to load code from incoming shift");
+      if(!action) return;
+      if(action.toLowerCase() === 'export'){
+        try {
+          var payload = btoa(unescape(encodeURIComponent(JSON.stringify(state))));
+          prompt("Copy this shift sync code and send it to incoming staff:", payload);
+        } catch(e){ alert("Export failed."); }
+      } else if(action.toLowerCase() === 'import'){
+        var code = prompt("Paste shift sync code here:");
+        if(!code) return;
+        try {
+          var decoded = JSON.parse(decodeURIComponent(escape(atob(code.trim()))));
+          if(decoded && decoded.wards){
+            state = decoded;
+            saveState();
+            render();
+            alert("Board successfully synced!");
+          } else { throw new Error(); }
+        } catch(e){ alert("Invalid sync code."); }
+      }
+    };
+  }
+
   /* Handover Summary Export */
   function buildSummaryHtml(onlyWardId){
     var html = '<div class="summary-page">';
@@ -993,7 +1104,7 @@
     };
   }
 
-  /* Full Print Generator (All 24 rooms & Beds A/B) */
+  /* Full Print Generator */
   function buildFullPrintHtml(){
     var w = currentWard();
     var html = '<div class="summary-page">';
