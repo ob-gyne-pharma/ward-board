@@ -175,8 +175,8 @@
   .patient-name-row .meta{font-size:0.76rem; color:var(--ink-soft);}
 
   .admit-row{
-    display:flex; align-items:center; justify-content:space-between;
-    background:var(--paper); border:1px solid var(--line-soft); border-radius:7px; padding:7px 10px; font-size:0.76rem;
+    display:flex; flex-direction:column; gap:2px;
+    background:var(--paper); border:1px solid var(--line-soft); border-radius:7px; padding:7px 10px; font-size:0.73rem; color:var(--ink-soft);
   }
   .next-review-row{
     display:flex; align-items:center; justify-content:space-between;
@@ -495,7 +495,6 @@
   };
 
   const app = initializeApp(firebaseConfig);
-  // Explicitly pass the databaseURL for europe-west1
   const db = getDatabase(app, firebaseConfig.databaseURL);
   const boardRef = ref(db, 'wardBoardState/v3');
 
@@ -598,6 +597,21 @@
   }
 
   function getStaffName(){ return (state.staffName || "").trim(); }
+  
+  function ensureStaffName(){
+    var current = getStaffName();
+    if(!current){
+      var name = prompt("Please enter your staff name/initials (required for tracking updates):", "");
+      if(name && name.trim()){
+        state.staffName = name.trim();
+        saveState();
+      } else {
+        state.staffName = "Unknown Staff";
+      }
+    }
+    return getStaffName();
+  }
+
   var staffBtn = document.getElementById("staffNameBtn");
   if(staffBtn){
     staffBtn.onclick = function(){
@@ -822,7 +836,15 @@
       '<span class="chk-badge '+(chk.consult?'checked':'')+'">✓ Consultant</span>' +
       '</div>';
 
-    html += '<div class="admit-row"><span>Admitted '+fmtDateShort(patient.admitted)+' ('+daysSince(patient.admitted)+'d)</span><span>Updated '+fmtTimeShort(lastEntry?lastEntry.time:patient.admitted)+'</span></div>';
+    // Staff attribution and timestamp display
+    var admittedByStr = patient.addedBy ? escapeHtml(patient.addedBy) : "Unknown";
+    var updatedByStr = lastEntry && lastEntry.updatedBy ? escapeHtml(lastEntry.updatedBy) : admittedByStr;
+    var updateTimeStr = fmtTimeShort(lastEntry ? lastEntry.time : patient.admitted);
+
+    html += '<div class="admit-row">' +
+      '<span>Admitted: '+fmtDateShort(patient.admitted)+' by <strong>'+admittedByStr+'</strong></span>' +
+      '<span>Last updated: <strong>'+updatedByStr+'</strong> at '+updateTimeStr+'</span>' +
+      '</div>';
 
     body.innerHTML = html;
 
@@ -842,7 +864,7 @@
         var realIdx = patient.history.length - 1 - idxRev;
         var he = document.createElement("div");
         he.className = "history-entry";
-        he.innerHTML = '<div class="h-time"><span>'+fmtTime(entry.time)+' · '+ACUITY_LABEL[entry.acuity]+'</span><span class="del" data-idx="'+realIdx+'">Delete</span></div>'+
+        he.innerHTML = '<div class="h-time"><span>'+fmtTime(entry.time)+' · '+ACUITY_LABEL[entry.acuity]+' · <strong>'+escapeHtml(entry.updatedBy||"Unknown")+'</strong></span><span class="del" data-idx="'+realIdx+'">Delete</span></div>'+
           (entry.situation?'<div class="h-row"><span class="h-label">Situation:</span> '+escapeHtml(entry.situation)+'</div>':'')+
           (entry.plan?'<div class="h-row"><span class="h-label">Plan:</span> '+escapeHtml(entry.plan)+'</div>':'');
         he.querySelector(".del").onclick = function(){
@@ -916,6 +938,7 @@
   });
 
   function openPatientModal(room, bed, patient){
+    ensureStaffName();
     currentBedForModal = {room:room, bed:bed};
     document.getElementById("modalTitle").textContent = room + bed + (patient ? " — Edit" : " — New Patient");
     setTypeUI(patient ? patient.type : "antenatal");
@@ -960,6 +983,7 @@
   if(savePat){
     savePat.onclick = function(){
       if(!currentBedForModal) return;
+      var staffName = ensureStaffName();
       var key = bedKey(currentBedForModal.room, currentBedForModal.bed);
       var w = currentWard();
       var existing = w.rooms[key];
@@ -993,7 +1017,7 @@
         mobilisation: getVal("f_mobilisation"),
         labs: getVal("f_labs"),
         admitted: existing ? existing.admitted : nowISO(),
-        addedBy: existing ? existing.addedBy : (getStaffName() || "Unknown"),
+        addedBy: existing ? existing.addedBy : staffName,
         history: existing && existing.history ? existing.history : []
       };
 
@@ -1017,6 +1041,7 @@
   });
 
   function openProgressModal(room, bed){
+    ensureStaffName();
     currentBedForProgress = {room:room, bed:bed};
     var patient = currentWard().rooms[bedKey(room, bed)];
     document.getElementById("progressModalTitle").textContent = "Progress Update — " + room + bed;
@@ -1044,6 +1069,7 @@
   if(saveProg){
     saveProg.onclick = function(){
       if(!currentBedForProgress) return;
+      var staffName = ensureStaffName();
       var patient = currentWard().rooms[bedKey(currentBedForProgress.room, currentBedForProgress.bed)];
       var ps = document.getElementById("p_situation");
       var pp = document.getElementById("p_plan");
@@ -1055,7 +1081,7 @@
         situation: ps ? ps.value.trim() : "",
         plan: pp ? pp.value.trim() : "",
         nextReview: pn ? pn.value.trim() : "",
-        updatedBy: getStaffName() || "Unknown"
+        updatedBy: staffName
       };
       patient.acuity = progressAcuity;
       if(!patient.history) patient.history = [];
@@ -1204,7 +1230,7 @@
   tickClock();
   setInterval(tickClock, 1000*30);
 
-  // Initialize and connect Firebase Real-Time Listener with Wake-Up
+  // Initialize and connect Firebase Real-Time Listener with priority overwrite
   loadState();
   if(getStaffName() && staffBtn){ staffBtn.textContent = "👤 " + getStaffName(); }
   render();
@@ -1214,6 +1240,7 @@
       if(remoteState && remoteState.wards){
         isRemoteUpdate = true;
         state = remoteState;
+        saveState(); // Update local storage with cloud priority
         initDefaultState();
         render();
         isRemoteUpdate = false;
