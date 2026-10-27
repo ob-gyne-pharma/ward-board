@@ -63,7 +63,6 @@
   .ward-tab.active{background:var(--accent); color:#fff;}
   .ward-tab.add-ward{background:#fff; border:1px dashed var(--line); color:var(--ink-soft);}
 
-  /* Floor Map Quick-Nav Bar */
   .floor-map-bar{
     display:flex; gap:4px; padding:8px 20px; background:#eef2f5;
     border-bottom:1px solid var(--line-soft); overflow-x:auto; -webkit-overflow-scrolling:touch;
@@ -178,12 +177,6 @@
     display:flex; flex-direction:column; gap:2px;
     background:var(--paper); border:1px solid var(--line-soft); border-radius:7px; padding:7px 10px; font-size:0.73rem; color:var(--ink-soft);
   }
-  .next-review-row{
-    display:flex; align-items:center; justify-content:space-between;
-    background:var(--amber-soft); border:1px solid #f0d9ae; border-radius:7px;
-    padding:7px 10px; font-size:0.78rem; color:var(--amber); font-weight:600;
-  }
-  .next-review-row.none{background:var(--paper); border-color:var(--line-soft); color:var(--ink-soft); font-weight:normal;}
 
   .bed-actions{display:flex; gap:8px; padding:10px 14px; border-top:1px solid var(--line-soft); background:#fcfdfd; flex-wrap:wrap;}
   .bed-actions button{flex:1; min-width:44%;}
@@ -301,7 +294,7 @@
   </div>
   <div class="header-actions">
     <span id="clock"></span>
-    <span id="cloudStatus" style="font-size:0.72rem; background:rgba(255,255,255,0.15); padding:3px 8px; border-radius:4px; color:#a2f2c8;">☁️ Connecting…</span>
+    <span id="cloudStatus" style="font-size:0.72rem; background:#293846; padding:3px 8px; border-radius:4px; color:#a2f2c8;">☁️ Connecting...</span>
     <button class="btn-ghost btn-small" id="staffNameBtn">👤 Set name</button>
     <button class="btn-ghost" id="exportSummaryBtn">Handover Summary</button>
     <button class="btn-ghost" id="printBtn">Full Print</button>
@@ -479,7 +472,7 @@
 <div id="summaryPrintView"></div>
 <div id="fullPrintView"></div>
 
-<!-- Firebase Real-Time Sync Script with Explicit European Database URL -->
+<!-- Firebase Real-Time Sync Script with On-Screen Diagnostics -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
   import { getDatabase, ref, set, onValue, goOnline, goOffline } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
@@ -494,35 +487,46 @@
     appId: "1:480376138159:web:b0b6fe7c43168b49bee75a"
   };
 
-  const app = initializeApp(firebaseConfig);
-  const db = getDatabase(app, firebaseConfig.databaseURL);
-  const boardRef = ref(db, 'wardBoardState/v3');
+  const statusEl = document.getElementById("cloudStatus");
 
-  window.firebaseSync = {
-    save: function(stateData) {
-      set(boardRef, stateData).catch(function(err){
-        console.warn("Firebase save error:", err);
-      });
-    },
-    listen: function(callback) {
-      onValue(boardRef, function(snapshot){
-        var val = snapshot.val();
-        callback(val);
-      });
-    }
-  };
+  try {
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app, firebaseConfig.databaseURL);
+    const boardRef = ref(db, 'wardBoardState/v3');
 
-  document.addEventListener("visibilitychange", function() {
-    if (document.visibilityState === "visible") {
-      goOnline(db);
-    } else {
-      goOffline(db);
-    }
-  });
+    window.firebaseSync = {
+      save: function(stateData) {
+        if(statusEl) statusEl.textContent = "📤 Saving...";
+        set(boardRef, stateData).then(function(){
+          if(statusEl) statusEl.textContent = "⚡ Live Sync Active";
+        }).catch(function(err){
+          console.error("Firebase save error:", err);
+          if(statusEl) statusEl.textContent = "❌ Save Error";
+        });
+      },
+      listen: function(callback) {
+        onValue(boardRef, function(snapshot){
+          var val = snapshot.val();
+          if(statusEl) statusEl.textContent = "⚡ Live Sync Active";
+          callback(val);
+        }, function(err){
+          console.error("Firebase read error:", err);
+          if(statusEl) statusEl.textContent = "❌ Read Error";
+        });
+      }
+    };
 
-  var statusEl = document.getElementById("cloudStatus");
-  if(statusEl){
-    statusEl.textContent = "⚡ Live Sync Active";
+    document.addEventListener("visibilitychange", function() {
+      if (document.visibilityState === "visible") {
+        goOnline(db);
+      } else {
+        goOffline(db);
+      }
+    });
+
+  } catch(e) {
+    console.error("Firebase init error:", e);
+    if(statusEl) statusEl.textContent = "❌ Init Error";
   }
 </script>
 
@@ -836,7 +840,6 @@
       '<span class="chk-badge '+(chk.consult?'checked':'')+'">✓ Consultant</span>' +
       '</div>';
 
-    // Staff attribution and timestamp display
     var admittedByStr = patient.addedBy ? escapeHtml(patient.addedBy) : "Unknown";
     var updatedByStr = lastEntry && lastEntry.updatedBy ? escapeHtml(lastEntry.updatedBy) : admittedByStr;
     var updateTimeStr = fmtTimeShort(lastEntry ? lastEntry.time : patient.admitted);
@@ -1230,7 +1233,7 @@
   tickClock();
   setInterval(tickClock, 1000*30);
 
-  // Initialize and connect Firebase Real-Time Listener with priority overwrite
+  // Initialize and connect Firebase Real-Time Listener
   loadState();
   if(getStaffName() && staffBtn){ staffBtn.textContent = "👤 " + getStaffName(); }
   render();
@@ -1240,12 +1243,10 @@
       if(remoteState && remoteState.wards){
         isRemoteUpdate = true;
         state = remoteState;
-        saveState(); // Update local storage with cloud priority
+        saveState(); 
         initDefaultState();
         render();
         isRemoteUpdate = false;
-        var statusEl = document.getElementById("cloudStatus");
-        if(statusEl) statusEl.textContent = "⚡ Live Sync Active";
       }
     });
   }
