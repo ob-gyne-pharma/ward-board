@@ -472,80 +472,12 @@
 <div id="summaryPrintView"></div>
 <div id="fullPrintView"></div>
 
-<!-- Firebase Real-Time Database Sync Script with Explicit European URL -->
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getDatabase, ref, set, onValue, goOnline, goOffline } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
-
-  const firebaseConfig = {
-    apiKey: "AIzaSyC7RoEpdCWOYfxnKyTykmhVV9xgnbeH3bE",
-    authDomain: "wardboard-e7035.firebaseapp.com",
-    databaseURL: "https://wardboard-e7035-default-rtdb.europe-west1.firebasedatabase.app",
-    projectId: "wardboard-e7035",
-    storageBucket: "wardboard-e7035.firebasestorage.app",
-    messagingSenderId: "480376138159",
-    appId: "1:480376138159:web:b0b6fe7c43168b49bee75a"
-  };
-
-  const statusEl = document.getElementById("cloudStatus");
-
-  try {
-    const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app, firebaseConfig.databaseURL);
-    const boardRef = ref(db, 'wardBoardState/v3');
-
-    window.firebaseSync = {
-      save: function(stateData) {
-        if(statusEl) statusEl.textContent = "📤 Saving...";
-        set(boardRef, stateData).then(function(){
-          if(statusEl) {
-            statusEl.textContent = "⚡ Live Sync Active";
-            statusEl.style.color = "#a2f2c8";
-          }
-        }).catch(function(err){
-          console.error("Firebase save error:", err);
-          if(statusEl) statusEl.textContent = "❌ Save Error";
-        });
-      },
-      listen: function(callback) {
-        onValue(boardRef, function(snapshot){
-          if(statusEl) {
-            statusEl.textContent = "⚡ Live Sync Active";
-            statusEl.style.color = "#a2f2c8";
-          }
-          callback(snapshot.val());
-        }, function(err){
-          console.error("Firebase read error:", err);
-          if(statusEl) {
-            statusEl.textContent = "❌ DB Error";
-            statusEl.style.color = "#ffb3b3";
-          }
-        });
-      }
-    };
-
-    document.addEventListener("visibilitychange", function() {
-      if (document.visibilityState === "visible") {
-        goOnline(db);
-      } else {
-        goOffline(db);
-      }
-    });
-
-  } catch(e) {
-    console.error("Firebase init error:", e);
-    if(statusEl) {
-      statusEl.textContent = "❌ Init Error";
-      statusEl.style.color = "#ffb3b3";
-    }
-  }
-</script>
-
 <script>
 (function(){
   "use strict";
 
   var STORAGE_KEY = "ward_board_v3";
+  var STAFF_NAME_KEY = "ward_board_staff_name";
   var ROOMS_PER_WARD = 24;
 
   var state = { wardOrder: [], wards: {} };
@@ -555,19 +487,45 @@
 
   function uid(){ return 'w' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 
-  function initDefaultState(){
-    if(!state.wardOrder || state.wardOrder.length === 0){
-      state.wardOrder = [];
-      state.wards = {};
-      ["Ward A","Ward B","Ward C","Ward D","Ward E"].forEach(function(name){
-        var id = uid();
-        state.wardOrder.push(id);
-        state.wards[id] = { name: name, rooms: {}, roomConfig: {} };
+  // Reconstructs empty objects that Firebase Realtime Database strips out
+  function normalizeState(s){
+    if(!s || typeof s !== "object") s = {};
+    if(!Array.isArray(s.wardOrder)) s.wardOrder = [];
+    if(!s.wards || typeof s.wards !== "object") s.wards = {};
+
+    s.wardOrder = s.wardOrder.filter(function(id){ return !!s.wards[id]; });
+
+    if(s.wardOrder.length === 0){
+      var defaults = [
+        { id: "ward_a", name: "Ward A" },
+        { id: "ward_b", name: "Ward B" },
+        { id: "ward_c", name: "Ward C" },
+        { id: "ward_d", name: "Ward D" },
+        { id: "ward_e", name: "Ward E" }
+      ];
+      defaults.forEach(function(d){
+        s.wardOrder.push(d.id);
+        s.wards[d.id] = { name: d.name, rooms: {}, roomConfig: {} };
       });
     }
-    if(!activeWardId || !state.wards[activeWardId]){
-      activeWardId = state.wardOrder[0];
+
+    s.wardOrder.forEach(function(id){
+      var w = s.wards[id];
+      if(!w.rooms || typeof w.rooms !== "object") w.rooms = {};
+      if(!w.roomConfig || typeof w.roomConfig !== "object") w.roomConfig = {};
+      Object.keys(w.rooms).forEach(function(bKey){
+        var p = w.rooms[bKey];
+        if(p){
+          if(!Array.isArray(p.history)) p.history = [];
+          if(!p.checklist || typeof p.checklist !== "object") p.checklist = {};
+        }
+      });
+    });
+
+    if(!activeWardId || !s.wards[activeWardId]){
+      activeWardId = s.wardOrder[0];
     }
+    return s;
   }
 
   function loadState(){
@@ -579,15 +537,16 @@
       }
     }catch(e){ localStorage.removeItem(STORAGE_KEY); }
 
-    initDefaultState();
+    state = normalizeState(state);
     var titleEl = document.getElementById("appTitle");
     if(titleEl && state.appTitle) titleEl.textContent = state.appTitle;
   }
 
   function saveState(){
     try{
+      state = normalizeState(state);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      if(!isRemoteUpdate && window.firebaseSync){
+      if(!isRemoteUpdate && window.firebaseSync && window.firebaseSync.save){
         window.firebaseSync.save(state);
       }
       return true;
@@ -596,6 +555,7 @@
 
   function currentWard(){
     var w = state.wards[activeWardId] || state.wards[state.wardOrder[0]];
+    if(!w.rooms) w.rooms = {};
     if(!w.roomConfig) w.roomConfig = {};
     return w;
   }
@@ -605,34 +565,48 @@
   function fmtTime(iso){ return new Date(iso).toLocaleString([], {weekday:'short', hour:'2-digit', minute:'2-digit', day:'2-digit', month:'short'}); }
   function fmtTimeShort(iso){ return new Date(iso).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); }
   function fmtDateShort(iso){ return new Date(iso).toLocaleDateString([], {day:'2-digit', month:'short'}); }
-  function daysSince(iso){ return Math.max(0, Math.floor((Date.now() - new Date(iso).getTime())/(1000*60*60*24))); }
   function escapeHtml(str){
     if(!str) return "";
     return String(str).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
   }
 
-  function getStaffName(){ return (state.staffName || "").trim(); }
-  
+  function getStaffName(){
+    return (localStorage.getItem(STAFF_NAME_KEY) || state.staffName || "").trim();
+  }
+  function setStaffName(name){
+    var clean = (name || "").trim();
+    localStorage.setItem(STAFF_NAME_KEY, clean);
+    var staffBtn = document.getElementById("staffNameBtn");
+    if(staffBtn) staffBtn.textContent = clean ? ("👤 " + clean) : "👤 Set name";
+  }
+
   function ensureStaffName(){
     var current = getStaffName();
     if(!current){
-      var name = prompt("Please enter your staff name/initials (required for tracking updates):", "");
+      var name = prompt("Please enter your staff name/initials (shown on patient updates):", "");
       if(name && name.trim()){
-        state.staffName = name.trim();
-        saveState();
+        setStaffName(name.trim());
       } else {
-        state.staffName = "Unknown Staff";
+        return "Staff";
       }
     }
-    return getStaffName();
+    return getStaffName() || "Staff";
   }
 
   var staffBtn = document.getElementById("staffNameBtn");
   if(staffBtn){
     staffBtn.onclick = function(){
       var name = prompt("Your name (shown on updates):", getStaffName());
-      if(name !== null){ state.staffName = name.trim(); saveState(); staffBtn.textContent = "👤 " + state.staffName; }
+      if(name !== null){ setStaffName(name); }
     };
+  }
+
+  var titleEl = document.getElementById("appTitle");
+  if(titleEl){
+    titleEl.addEventListener("blur", function(){
+      state.appTitle = titleEl.textContent.trim() || "Ward Board";
+      saveState();
+    });
   }
 
   /* Ward Tabs */
@@ -642,6 +616,7 @@
     wardTabsEl.innerHTML = "";
     state.wardOrder.forEach(function(id){
       var w = state.wards[id];
+      if(!w) return;
       var tab = document.createElement("div");
       tab.className = "ward-tab" + (id===activeWardId ? " active" : "");
       tab.textContent = w.name;
@@ -678,9 +653,9 @@
 
       var pA = w.rooms[r+"A"];
       var pB = w.rooms[r+"B"];
-      var targetP = pA || pB;
+      var targetP = (pA && pA.acuity === "urgent") ? pA : ((pB && pB.acuity === "urgent") ? pB : (pA || pB));
       if(targetP){
-        pill.classList.add("occ-" + targetP.acuity);
+        pill.classList.add("occ-" + (targetP.acuity || "stable"));
       }
       bar.appendChild(pill);
     }
@@ -690,6 +665,7 @@
   var ACUITY_LABEL = { stable:"Stable", review:"Needs Review", urgent:"Urgent" };
 
   function render(){
+    state = normalizeState(state);
     renderWardTabs();
     renderFloorMapBar();
     var grid = document.getElementById("grid");
@@ -708,8 +684,8 @@
     var w = currentWard();
 
     for(var r=1; r<=ROOMS_PER_WARD; r++){
-      var beds = ["A"];
-      if(w.roomConfig && w.roomConfig[r] && w.roomConfig[r].hasB) beds.push("B");
+      var hasB = (w.roomConfig && w.roomConfig[r] && w.roomConfig[r].hasB) || !!w.rooms[r+"B"];
+      var beds = hasB ? ["A", "B"] : ["A"];
       beds.forEach(function(bed){
         var p = w.rooms[bedKey(r, bed)] || null;
         if(p){
@@ -736,6 +712,8 @@
 
     for(var room=1; room<=ROOMS_PER_WARD; room++){
       if(!w.roomConfig[room]) w.roomConfig[room] = { hasB: !!w.rooms[room+"B"] };
+      if(w.rooms[room+"B"]) w.roomConfig[room].hasB = true;
+
       var activeBeds = ["A"];
       if(w.roomConfig[room].hasB) activeBeds.push("B");
 
@@ -779,7 +757,7 @@
           addBBtn.textContent = "+ Add Bed B";
           addBBtn.onclick = (function(rNum){
             return function(){
-              w.roomConfig[rNum].hasB = true;
+              w.roomConfig[rNum] = { hasB: true };
               saveState(); render();
             };
           })(room);
@@ -792,8 +770,8 @@
           removeBBtn.onclick = (function(rNum){
             return function(){
               if(w.rooms[rNum+"B"] && !confirm("Bed B is occupied. Remove it anyway?")) return;
-              w.rooms[rNum+"B"] = null;
-              w.roomConfig[rNum].hasB = false;
+              delete w.rooms[rNum+"B"];
+              w.roomConfig[rNum] = { hasB: false };
               saveState(); render();
             };
           })(room);
@@ -814,7 +792,7 @@
     top.className = "bed-top";
     top.innerHTML = '<div class="bed-num"><span class="bar"></span>'+room+bed+'</div>';
     if(patient){
-      top.innerHTML += '<div class="tag-row"><span class="tag acuity-'+patient.acuity+'">'+ACUITY_LABEL[patient.acuity]+'</span><span class="tag type-'+patient.type+'">'+TYPE_LABEL[patient.type]+'</span>'+(patient.unit?'<span class="tag unit-tag">Unit '+escapeHtml(patient.unit)+'</span>':'')+'</div>';
+      top.innerHTML += '<div class="tag-row"><span class="tag acuity-'+patient.acuity+'">'+(ACUITY_LABEL[patient.acuity]||"Stable")+'</span><span class="tag type-'+patient.type+'">'+(TYPE_LABEL[patient.type]||"Antenatal")+'</span>'+(patient.unit?'<span class="tag unit-tag">Unit '+escapeHtml(patient.unit)+'</span>':'')+'</div>';
     }
     card.appendChild(top);
 
@@ -851,13 +829,13 @@
       '<span class="chk-badge '+(chk.consult?'checked':'')+'">✓ Consultant</span>' +
       '</div>';
 
-    var admittedByStr = patient.addedBy ? escapeHtml(patient.addedBy) : "Unknown";
-    var updatedByStr = lastEntry && lastEntry.updatedBy ? escapeHtml(lastEntry.updatedBy) : admittedByStr;
-    var updateTimeStr = fmtTimeShort(lastEntry ? lastEntry.time : patient.admitted);
+    var admittedByStr = patient.addedBy ? escapeHtml(patient.addedBy) : "Staff";
+    var updatedByStr = (lastEntry && lastEntry.updatedBy) ? escapeHtml(lastEntry.updatedBy) : (patient.lastUpdatedBy ? escapeHtml(patient.lastUpdatedBy) : admittedByStr);
+    var updateTimeIso = lastEntry ? lastEntry.time : (patient.lastUpdated || patient.admitted);
 
     html += '<div class="admit-row">' +
-      '<span>Admitted: '+fmtDateShort(patient.admitted)+' by <strong>'+admittedByStr+'</strong></span>' +
-      '<span>Last updated: <strong>'+updatedByStr+'</strong> at '+updateTimeStr+'</span>' +
+      '<span>Admitted: '+fmtDateShort(patient.admitted)+' at '+fmtTimeShort(patient.admitted)+' by <strong>'+admittedByStr+'</strong></span>' +
+      '<span>Last updated: <strong>'+updatedByStr+'</strong> at '+fmtTimeShort(updateTimeIso)+'</span>' +
       '</div>';
 
     body.innerHTML = html;
@@ -878,7 +856,7 @@
         var realIdx = patient.history.length - 1 - idxRev;
         var he = document.createElement("div");
         he.className = "history-entry";
-        he.innerHTML = '<div class="h-time"><span>'+fmtTime(entry.time)+' · '+ACUITY_LABEL[entry.acuity]+' · <strong>'+escapeHtml(entry.updatedBy||"Unknown")+'</strong></span><span class="del" data-idx="'+realIdx+'">Delete</span></div>'+
+        he.innerHTML = '<div class="h-time"><span>'+fmtTime(entry.time)+' · '+(ACUITY_LABEL[entry.acuity]||"Stable")+' · <strong>'+escapeHtml(entry.updatedBy||"Staff")+'</strong></span><span class="del" data-idx="'+realIdx+'">Delete</span></div>'+
           (entry.situation?'<div class="h-row"><span class="h-label">Situation:</span> '+escapeHtml(entry.situation)+'</div>':'')+
           (entry.plan?'<div class="h-row"><span class="h-label">Plan:</span> '+escapeHtml(entry.plan)+'</div>':'');
         he.querySelector(".del").onclick = function(){
@@ -910,7 +888,7 @@
     dischargeBtn.textContent = "Discharge";
     dischargeBtn.onclick = function(){
       if(confirm("Discharge patient from "+room+bed+"?")){
-        currentWard().rooms[bedKey(room,bed)] = null;
+        delete currentWard().rooms[bedKey(room,bed)];
         saveState(); render();
       }
     };
@@ -1032,6 +1010,8 @@
         labs: getVal("f_labs"),
         admitted: existing ? existing.admitted : nowISO(),
         addedBy: existing ? existing.addedBy : staffName,
+        lastUpdated: nowISO(),
+        lastUpdatedBy: staffName,
         history: existing && existing.history ? existing.history : []
       };
 
@@ -1098,6 +1078,8 @@
         updatedBy: staffName
       };
       patient.acuity = progressAcuity;
+      patient.lastUpdated = entry.time;
+      patient.lastUpdatedBy = staffName;
       if(!patient.history) patient.history = [];
       patient.history.push(entry);
       saveState();
@@ -1120,8 +1102,8 @@
       if(!w || !w.rooms) return;
       var rows = [];
       for(var r=1; r<=ROOMS_PER_WARD; r++){
-        var beds = ["A"];
-        if(w.roomConfig && w.roomConfig[r] && w.roomConfig[r].hasB) beds.push("B");
+        var hasB = (w.roomConfig && w.roomConfig[r] && w.roomConfig[r].hasB) || !!w.rooms[r+"B"];
+        var beds = hasB ? ["A", "B"] : ["A"];
         beds.forEach(function(bed){
           var p = w.rooms[bedKey(r,bed)];
           if(p) rows.push({room:r, bed:bed, patient:p});
@@ -1145,7 +1127,7 @@
         html += '<tr>' +
           '<td class="bed-col"><span class="acuity-dot '+p.acuity+'"></span>'+row.room+row.bed+'</td>' +
           '<td>'+escapeHtml(p.name||"—")+(p.age?(' <span style="color:#777;">'+escapeHtml(p.age)+'</span>'):'')+'</td>' +
-          '<td>'+TYPE_LABEL[p.type]+'</td>' +
+          '<td>'+(TYPE_LABEL[p.type]||"—")+'</td>' +
           '<td>'+escapeHtml(p.unit||"—")+'</td>' +
           '<td>'+escapeHtml(p.diagnosis||"—")+'</td>' +
           '<td>'+escapeHtml(combined||"—")+'</td>' +
@@ -1189,8 +1171,8 @@
       '</tr></thead><tbody>';
 
     for(var r=1; r<=ROOMS_PER_WARD; r++){
-      var beds = ["A"];
-      if(w.roomConfig && w.roomConfig[r] && w.roomConfig[r].hasB) beds.push("B");
+      var hasB = (w.roomConfig && w.roomConfig[r] && w.roomConfig[r].hasB) || !!w.rooms[r+"B"];
+      var beds = hasB ? ["A", "B"] : ["A"];
       beds.forEach(function(bed){
         var key = bedKey(r, bed);
         var p = w.rooms[key];
@@ -1203,8 +1185,8 @@
           var nextReview = lastEntry && lastEntry.nextReview !== undefined ? lastEntry.nextReview : p.nextReview;
           
           html += '<td><strong>'+escapeHtml(p.name||"Unnamed")+'</strong>'+(p.age?' ('+escapeHtml(p.age)+')':'')+'</td>';
-          html += '<td>'+TYPE_LABEL[p.type]+(p.unit?' / Unit '+escapeHtml(p.unit):'')+'</td>';
-          html += '<td><span class="acuity-dot '+p.acuity+'"></span>'+ACUITY_LABEL[p.acuity]+'</td>';
+          html += '<td>'+(TYPE_LABEL[p.type]||"—")+(p.unit?' / Unit '+escapeHtml(p.unit):'')+'</td>';
+          html += '<td><span class="acuity-dot '+p.acuity+'"></span>'+(ACUITY_LABEL[p.acuity]||"Stable")+'</td>';
           html += '<td><strong>Dx:</strong> '+escapeHtml(p.diagnosis||"—")+'<br><strong>Sit:</strong> '+escapeHtml(situation||"—")+'</td>';
           html += '<td><strong>Plan:</strong> '+escapeHtml(plan||"—")+(nextReview?'<br><strong>Review:</strong> '+escapeHtml(nextReview):'')+'</td>';
         } else {
@@ -1244,27 +1226,114 @@
   tickClock();
   setInterval(tickClock, 1000*30);
 
-  // Initialize and connect Firebase Real-Time Listener
+  // Global callback invoked directly by the Firebase module whenever cloud data arrives
+  window.handleRemoteState = function(remoteState){
+    if(remoteState && (remoteState.wards || remoteState.wardOrder)){
+      isRemoteUpdate = true;
+      var previousWardName = (state.wards && state.wards[activeWardId]) ? state.wards[activeWardId].name : null;
+      state = normalizeState(remoteState);
+
+      // Keep the user on the same ward tab by name even if ward IDs came from another device
+      if(previousWardName && (!state.wards[activeWardId] || state.wards[activeWardId].name !== previousWardName)){
+        state.wardOrder.forEach(function(id){
+          if(state.wards[id] && state.wards[id].name === previousWardName){
+            activeWardId = id;
+          }
+        });
+      }
+
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      var tEl = document.getElementById("appTitle");
+      if(tEl && state.appTitle) tEl.textContent = state.appTitle;
+      render();
+      isRemoteUpdate = false;
+    } else {
+      // Cloud DB is empty — push initial state up to the cloud
+      saveState();
+    }
+  };
+
   loadState();
   if(getStaffName() && staffBtn){ staffBtn.textContent = "👤 " + getStaffName(); }
   render();
 
-  if(window.firebaseSync){
-    window.firebaseSync.listen(function(remoteState){
-      if(remoteState && remoteState.wards){
-        isRemoteUpdate = true;
-        state = remoteState;
-        saveState(); 
-        initDefaultState();
-        render();
-        isRemoteUpdate = false;
-      } else {
-        saveState();
+})();
+</script>
+
+<!-- Firebase Real-Time Sync Module (Self-Starting) -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getDatabase, ref, set, onValue, goOnline, goOffline } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyC7RoEpdCWOYfxnKyTykmhVV9xgnbeH3bE",
+    authDomain: "wardboard-e7035.firebaseapp.com",
+    databaseURL: "https://wardboard-e7035-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "wardboard-e7035",
+    storageBucket: "wardboard-e7035.firebasestorage.app",
+    messagingSenderId: "480376138159",
+    appId: "1:480376138159:web:b0b6fe7c43168b49bee75a"
+  };
+
+  const statusEl = document.getElementById("cloudStatus");
+
+  try {
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app, firebaseConfig.databaseURL);
+    const boardRef = ref(db, 'wardBoardState/v3');
+
+    window.firebaseSync = {
+      save: function(stateData) {
+        if(statusEl) {
+          statusEl.textContent = "📤 Saving...";
+          statusEl.style.color = "#fbeae9";
+        }
+        const cleanPayload = JSON.parse(JSON.stringify(stateData));
+        set(boardRef, cleanPayload).then(function(){
+          if(statusEl) {
+            statusEl.textContent = "⚡ Live Sync Active";
+            statusEl.style.color = "#a2f2c8";
+          }
+        }).catch(function(err){
+          console.error("Firebase save error:", err);
+          if(statusEl) {
+            statusEl.textContent = "❌ Save Error";
+            statusEl.style.color = "#ffb3b3";
+          }
+        });
+      }
+    };
+
+    // Start listening immediately when module loads
+    onValue(boardRef, function(snapshot){
+      if(statusEl) {
+        statusEl.textContent = "⚡ Live Sync Active";
+        statusEl.style.color = "#a2f2c8";
+      }
+      if(window.handleRemoteState){
+        window.handleRemoteState(snapshot.val());
+      }
+    }, function(err){
+      console.error("Firebase read error:", err);
+      if(statusEl) {
+        statusEl.textContent = "❌ Sync Error";
+        statusEl.style.color = "#ffb3b3";
       }
     });
-  }
 
-})();
+    document.addEventListener("visibilitychange", function() {
+      if (document.visibilityState === "visible") {
+        goOnline(db);
+      }
+    });
+
+  } catch(e) {
+    console.error("Firebase init error:", e);
+    if(statusEl) {
+      statusEl.textContent = "❌ Init Error";
+      statusEl.style.color = "#ffb3b3";
+    }
+  }
 </script>
 </body>
 </html>
