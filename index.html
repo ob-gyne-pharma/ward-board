@@ -462,6 +462,7 @@
       <div class="form-field"><label>Plan</label><textarea id="p_plan"></textarea></div>
       <div class="form-field"><label>Next review</label><input type="text" id="p_nextReview" placeholder="e.g. Tomorrow AM round"></div>
     </div>
+    <div id="progressSaveError" role="alert" aria-live="polite" style="display:none;margin:0 16px 8px;padding:10px 12px;border-radius:8px;background:#fbeae9;color:#8f1d18;font-size:0.9rem;"></div>
     <div class="modal-foot">
       <button class="btn-outline" id="cancelProgressModal">Cancel</button>
       <button class="btn-primary" id="saveProgressModal">Save Update</button>
@@ -580,24 +581,39 @@
     if(staffBtn) staffBtn.textContent = clean ? ("👤 " + clean) : "👤 Set name";
   }
 
+  /* Returns the staff name, or null if not set (callers must handle null) */
   function ensureStaffName(){
-    var current = getStaffName();
-    if(!current){
-      var name = prompt("Please enter your staff name/initials (shown on patient updates):", "");
-      if(name && name.trim()){
-        setStaffName(name.trim());
-      } else {
-        return "Staff";
-      }
-    }
-    return getStaffName() || "Staff";
+    return getStaffName() || null;
+  }
+
+  function showSaveError(elementId, msg){
+    var el = document.getElementById(elementId);
+    if(!el) return;
+    el.textContent = msg;
+    el.style.display = "block";
+    el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  function hideSaveError(elementId){
+    var el = document.getElementById(elementId);
+    if(el){ el.style.display = "none"; el.textContent = ""; }
   }
 
   var staffBtn = document.getElementById("staffNameBtn");
   if(staffBtn){
     staffBtn.onclick = function(){
-      var name = prompt("Your name (shown on updates):", getStaffName());
-      if(name !== null){ setStaffName(name); }
+      var current = getStaffName();
+      var name = prompt("Your name / initials (shown on all updates):", current);
+      if(name === null) return; // user pressed Cancel — keep existing
+      var clean = name.trim();
+      if(!clean){
+        alert("Name cannot be blank. Please enter your name or initials.");
+        return;
+      }
+      setStaffName(clean);
+      // clear any lingering save errors now that name is set
+      hideSaveError("patientSaveError");
+      hideSaveError("progressSaveError");
     };
   }
 
@@ -930,7 +946,6 @@
   });
 
   function openPatientModal(room, bed, patient){
-    ensureStaffName();
     currentBedForModal = {room:room, bed:bed};
     document.getElementById("modalTitle").textContent = room + bed + (patient ? " — Edit" : " — New Patient");
     setTypeUI(patient ? patient.type : "antenatal");
@@ -964,7 +979,11 @@
     if(patientOverlay) patientOverlay.classList.add("show");
   }
 
-  function closePatientModal(){ if(patientOverlay) patientOverlay.classList.remove("show"); currentBedForModal = null; }
+  function closePatientModal(){
+    if(patientOverlay) patientOverlay.classList.remove("show");
+    currentBedForModal = null;
+    hideSaveError("patientSaveError");
+  }
 
   var cPat = document.getElementById("closePatientModal");
   var canPat = document.getElementById("cancelPatientModal");
@@ -975,7 +994,12 @@
   if(savePat){
     savePat.onclick = function(){
       if(!currentBedForModal) return;
+      hideSaveError("patientSaveError");
       var staffName = ensureStaffName();
+      if(!staffName){
+        showSaveError("patientSaveError", "⚠️ Please set your name before saving. Tap \"👤 Set name\" in the top bar.");
+        return;
+      }
       var key = bedKey(currentBedForModal.room, currentBedForModal.bed);
       var w = currentWard();
       var existing = w.rooms[key];
@@ -1035,7 +1059,6 @@
   });
 
   function openProgressModal(room, bed){
-    ensureStaffName();
     currentBedForProgress = {room:room, bed:bed};
     var patient = currentWard().rooms[bedKey(room, bed)];
     document.getElementById("progressModalTitle").textContent = "Progress Update — " + room + bed;
@@ -1052,7 +1075,11 @@
     if(progressOverlay) progressOverlay.classList.add("show");
   }
 
-  function closeProgressModal(){ if(progressOverlay) progressOverlay.classList.remove("show"); currentBedForProgress = null; }
+  function closeProgressModal(){
+    if(progressOverlay) progressOverlay.classList.remove("show");
+    currentBedForProgress = null;
+    hideSaveError("progressSaveError");
+  }
 
   var cProg = document.getElementById("closeProgressModal");
   var canProg = document.getElementById("cancelProgressModal");
@@ -1063,7 +1090,12 @@
   if(saveProg){
     saveProg.onclick = function(){
       if(!currentBedForProgress) return;
+      hideSaveError("progressSaveError");
       var staffName = ensureStaffName();
+      if(!staffName){
+        showSaveError("progressSaveError", "⚠️ Please set your name before saving. Tap \"👤 Set name\" in the top bar.");
+        return;
+      }
       var patient = currentWard().rooms[bedKey(currentBedForProgress.room, currentBedForProgress.bed)];
       var ps = document.getElementById("p_situation");
       var pp = document.getElementById("p_plan");
