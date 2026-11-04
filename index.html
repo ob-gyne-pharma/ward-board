@@ -283,6 +283,29 @@
     .toolbar{padding:10px 14px; flex-direction:column; align-items:stretch;}
     .filter-row select, .filter-row input{flex:1;}
   }
+
+  /* HOD Panel */
+  .btn-hod{color:#e8c84a !important; border-color:rgba(232,200,74,0.35) !important;}
+  .btn-hod:hover{background:rgba(232,200,74,0.12) !important;}
+  .hod-section{margin-bottom:22px; padding-bottom:18px; border-bottom:1px solid var(--line-soft);}
+  .hod-section:last-of-type{border-bottom:none; margin-bottom:0; padding-bottom:0;}
+  .hod-section-title{font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--ink-soft);margin-bottom:12px;}
+  .hod-ward-row{display:flex;gap:8px;align-items:center;}
+  .hod-ward-row input{flex:1;}
+  .hod-ward-row button{white-space:nowrap;}
+  .hist-entry{padding:9px 12px;border-bottom:1px solid var(--line-soft);display:flex;flex-direction:column;gap:3px;}
+  .hist-entry:last-child{border-bottom:none;}
+  .hist-entry-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap;}
+  .hist-entry-who{font-weight:600;color:var(--ink);}
+  .hist-entry-time{font-size:0.75rem;color:var(--ink-soft);}
+  .hist-entry-ward{font-size:0.75rem;color:var(--accent);font-weight:600;}
+  .hist-entry-body{color:var(--ink-soft);font-size:0.8rem;line-height:1.4;}
+  .hist-entry-type{display:inline-block;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;padding:2px 6px;border-radius:4px;background:var(--line-soft);color:var(--ink-soft);}
+  .hist-entry-type.progress{background:var(--blue-soft);color:var(--blue);}
+  .hist-entry-type.admit{background:var(--accent-soft);color:var(--accent);}
+  .hist-entry-type.discharge{background:var(--red-soft);color:var(--red);}
+  .hist-entry-type.handover{background:var(--amber-soft);color:var(--amber);}
+  .hist-empty{padding:24px;text-align:center;color:var(--ink-soft);font-size:0.85rem;}
 </style>
 </head>
 <body>
@@ -296,6 +319,7 @@
     <span id="clock"></span>
     <span id="cloudStatus" style="font-size:0.72rem; background:#293846; padding:3px 8px; border-radius:4px; color:#fbeae9;">☁️ Connecting...</span>
     <button class="btn-ghost btn-small" id="staffNameBtn">👤 Set name</button>
+    <button class="btn-ghost btn-hod" id="hodBtn" style="display:none;">🔑 HOD</button>
     <button class="btn-ghost" id="exportSummaryBtn">Handover Summary</button>
     <button class="btn-ghost" id="printBtn">Full Print</button>
   </div>
@@ -470,6 +494,96 @@
   </div>
 </div>
 
+<!-- HOD PIN Modal -->
+<div class="overlay" id="hodPinOverlay">
+  <div class="modal" style="max-width:340px;">
+    <div class="modal-head">
+      <h2>🔑 HOD Access</h2>
+      <button class="modal-close" id="closeHodPinModal">✕</button>
+    </div>
+    <div class="modal-body" style="padding:20px 24px 8px;">
+      <p style="margin:0 0 14px;font-size:0.9rem;color:var(--ink-soft);">Enter the HOD PIN to unlock admin controls.</p>
+      <div class="form-field">
+        <label>PIN</label>
+        <input type="password" id="hodPinInput" placeholder="••••" maxlength="8" autocomplete="off"
+          style="font-size:1.4rem;letter-spacing:0.3em;text-align:center;">
+      </div>
+      <div id="hodPinError" style="display:none;color:var(--red);font-size:0.85rem;margin-top:6px;"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-outline" id="cancelHodPin">Cancel</button>
+      <button class="btn-primary" id="submitHodPin">Unlock</button>
+    </div>
+  </div>
+</div>
+
+<!-- HOD Panel Modal -->
+<div class="overlay" id="hodPanelOverlay">
+  <div class="modal" style="max-width:520px;">
+    <div class="modal-head">
+      <h2>🔑 HOD Panel</h2>
+      <button class="modal-close" id="closeHodPanel">✕</button>
+    </div>
+    <div class="modal-body" style="padding:20px 24px;">
+
+      <!-- Section: Rename -->
+      <div class="hod-section">
+        <div class="hod-section-title">✏️ Rename</div>
+        <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
+          <div class="form-field" style="flex:1;min-width:140px;">
+            <label>App title</label>
+            <input type="text" id="hod_appTitle" placeholder="e.g. OB-Gyne Ward Board">
+          </div>
+          <button class="btn-primary" id="hod_saveTitle" style="margin-bottom:0;white-space:nowrap;">Save title</button>
+        </div>
+        <div style="margin-top:10px;">
+          <label style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--ink-soft);display:block;margin-bottom:6px;">Ward names</label>
+          <div id="hod_wardList" style="display:flex;flex-direction:column;gap:6px;"></div>
+        </div>
+      </div>
+
+      <!-- Section: History Log -->
+      <div class="hod-section">
+        <div class="hod-section-title">📋 History &amp; Handover Log (last 30 days)</div>
+        <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+          <select id="hod_histWard" style="flex:1;min-width:120px;">
+            <option value="">All wards</option>
+          </select>
+          <select id="hod_histType" style="flex:1;min-width:120px;">
+            <option value="">All entries</option>
+            <option value="progress">Progress updates</option>
+            <option value="handover">Handover exports</option>
+            <option value="admit">Admissions</option>
+            <option value="discharge">Discharges</option>
+          </select>
+        </div>
+        <div id="hod_histLog" style="max-height:280px;overflow-y:auto;border:1px solid var(--line);border-radius:8px;font-size:0.82rem;"></div>
+      </div>
+
+      <!-- Section: Change HOD PIN -->
+      <div class="hod-section">
+        <div class="hod-section-title">🔒 Change HOD PIN</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;">
+          <div class="form-field" style="flex:1;min-width:110px;">
+            <label>New PIN</label>
+            <input type="password" id="hod_newPin" placeholder="4–8 digits" maxlength="8" autocomplete="new-password">
+          </div>
+          <div class="form-field" style="flex:1;min-width:110px;">
+            <label>Confirm PIN</label>
+            <input type="password" id="hod_confirmPin" placeholder="Repeat" maxlength="8" autocomplete="new-password">
+          </div>
+          <button class="btn-outline" id="hod_savePin" style="white-space:nowrap;">Update PIN</button>
+        </div>
+        <div id="hod_pinMsg" style="display:none;font-size:0.82rem;margin-top:6px;"></div>
+      </div>
+
+      <div style="text-align:right;margin-top:4px;">
+        <button class="btn-danger-outline" id="hod_lockBtn" style="font-size:0.8rem;">🔒 Lock HOD session</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Handover Export Modal -->
 <div class="overlay" id="handoverOverlay">
   <div class="modal" style="max-width:360px;">
@@ -600,6 +714,264 @@
     var staffBtn = document.getElementById("staffNameBtn");
     if(staffBtn) staffBtn.textContent = clean ? ("👤 " + clean) : "👤 Set name";
   }
+
+  /* ============================================================
+     HOD ACCESS CONTROL
+     Default PIN: 1234  (HOD should change it on first use)
+     PIN is stored hashed (simple FNV-32) in localStorage.
+     Session unlocked flag lives only in memory — resets on reload.
+  ============================================================ */
+  var HOD_PIN_KEY  = "ward_board_hod_pin";
+  var HOD_DEFAULT  = "1234";
+  var hodUnlocked  = false;
+
+  function fnv32(str){
+    var h = 0x811c9dc5;
+    for(var i=0;i<str.length;i++){ h ^= str.charCodeAt(i); h = (h * 0x01000193) >>> 0; }
+    return h.toString(16);
+  }
+  function getStoredPinHash(){
+    return localStorage.getItem(HOD_PIN_KEY) || fnv32(HOD_DEFAULT);
+  }
+  function checkPin(pin){
+    return fnv32(pin) === getStoredPinHash();
+  }
+  function savePin(pin){
+    localStorage.setItem(HOD_PIN_KEY, fnv32(pin));
+  }
+
+  /* Log an event to state.hodLog (last 30 days rolling) */
+  function hodLog(type, detail, wardName){
+    if(!state.hodLog) state.hodLog = [];
+    var cutoff = Date.now() - 30*24*60*60*1000;
+    state.hodLog = state.hodLog.filter(function(e){ return new Date(e.time).getTime() > cutoff; });
+    state.hodLog.push({
+      type: type,           // admit | discharge | progress | handover
+      time: nowISO(),
+      by:   getStaffName() || "?",
+      ward: wardName || (state.wards[activeWardId] ? state.wards[activeWardId].name : ""),
+      detail: detail
+    });
+    // Don't call saveState here — callers will do it
+  }
+
+  /* Unlock / Lock */
+  function unlockHod(){
+    hodUnlocked = true;
+    var btn = document.getElementById("hodBtn");
+    if(btn){ btn.style.display = ""; btn.textContent = "🔑 HOD ✓"; }
+  }
+  function lockHod(){
+    hodUnlocked = false;
+    var btn = document.getElementById("hodBtn");
+    if(btn){ btn.style.display = ""; btn.textContent = "🔑 HOD"; }
+    var panel = document.getElementById("hodPanelOverlay");
+    if(panel) panel.classList.remove("show");
+  }
+
+  /* Always show HOD button — clicking opens PIN if locked, panel if unlocked */
+  (function(){
+    var btn = document.getElementById("hodBtn");
+    if(btn){
+      btn.style.display = "";
+      btn.onclick = function(){
+        if(hodUnlocked){ openHodPanel(); }
+        else { openHodPin(); }
+      };
+    }
+  })();
+
+  /* PIN modal */
+  function openHodPin(){
+    var ov = document.getElementById("hodPinOverlay");
+    var inp = document.getElementById("hodPinInput");
+    var err = document.getElementById("hodPinError");
+    if(inp){ inp.value = ""; }
+    if(err){ err.style.display="none"; err.textContent=""; }
+    if(ov) ov.classList.add("show");
+    setTimeout(function(){ if(inp) inp.focus(); }, 120);
+  }
+  function closeHodPin(){
+    var ov = document.getElementById("hodPinOverlay");
+    if(ov) ov.classList.remove("show");
+  }
+  document.getElementById("closeHodPinModal").onclick = closeHodPin;
+  document.getElementById("cancelHodPin").onclick    = closeHodPin;
+  document.getElementById("hodPinInput").addEventListener("keydown", function(e){
+    if(e.key==="Enter") document.getElementById("submitHodPin").click();
+  });
+  document.getElementById("submitHodPin").onclick = function(){
+    var pin = (document.getElementById("hodPinInput").value || "").trim();
+    var err = document.getElementById("hodPinError");
+    if(!pin){ err.textContent="Please enter the PIN."; err.style.display="block"; return; }
+    if(checkPin(pin)){
+      closeHodPin();
+      unlockHod();
+      openHodPanel();
+    } else {
+      err.textContent = "❌ Incorrect PIN. Try again.";
+      err.style.display = "block";
+      document.getElementById("hodPinInput").value = "";
+      document.getElementById("hodPinInput").focus();
+    }
+  };
+
+  /* HOD Panel */
+  function openHodPanel(){
+    var ov = document.getElementById("hodPanelOverlay");
+    if(!ov) return;
+    // Populate app title
+    var ti = document.getElementById("hod_appTitle");
+    if(ti) ti.value = state.appTitle || "Ward Board";
+    // Populate ward list
+    renderHodWardList();
+    // Populate ward filter dropdown in history
+    renderHodHistWardFilter();
+    // Render history
+    renderHodHistory();
+    ov.classList.add("show");
+  }
+
+  document.getElementById("closeHodPanel").onclick  = function(){ document.getElementById("hodPanelOverlay").classList.remove("show"); };
+  document.getElementById("hod_lockBtn").onclick    = lockHod;
+
+  /* Save app title */
+  document.getElementById("hod_saveTitle").onclick = function(){
+    var val = (document.getElementById("hod_appTitle").value || "").trim() || "Ward Board";
+    state.appTitle = val;
+    var el = document.getElementById("appTitle");
+    if(el) el.textContent = val;
+    saveState();
+    var btn = document.getElementById("hod_saveTitle");
+    btn.textContent = "✓ Saved"; setTimeout(function(){ btn.textContent = "Save title"; }, 1500);
+  };
+
+  /* Ward rename list */
+  function renderHodWardList(){
+    var container = document.getElementById("hod_wardList");
+    if(!container) return;
+    container.innerHTML = "";
+    state.wardOrder.forEach(function(id){
+      var w = state.wards[id];
+      if(!w) return;
+      var row = document.createElement("div");
+      row.className = "hod-ward-row";
+      var inp = document.createElement("input");
+      inp.type = "text"; inp.value = w.name; inp.placeholder = "Ward name";
+      var saveBtn = document.createElement("button");
+      saveBtn.className = "btn-outline"; saveBtn.textContent = "Save";
+      saveBtn.onclick = function(){
+        var newName = inp.value.trim();
+        if(!newName) return;
+        w.name = newName;
+        saveState();
+        renderWardTabs();
+        saveBtn.textContent = "✓"; setTimeout(function(){ saveBtn.textContent = "Save"; }, 1200);
+      };
+      row.appendChild(inp); row.appendChild(saveBtn);
+      container.appendChild(row);
+    });
+  }
+
+  /* History ward filter */
+  function renderHodHistWardFilter(){
+    var sel = document.getElementById("hod_histWard");
+    if(!sel) return;
+    sel.innerHTML = '<option value="">All wards</option>';
+    state.wardOrder.forEach(function(id){
+      var w = state.wards[id]; if(!w) return;
+      var o = document.createElement("option"); o.value = w.name; o.textContent = w.name;
+      sel.appendChild(o);
+    });
+  }
+
+  /* History rendering */
+  function renderHodHistory(){
+    var container = document.getElementById("hod_histLog");
+    if(!container) return;
+    var wardFilter = (document.getElementById("hod_histWard")||{}).value || "";
+    var typeFilter = (document.getElementById("hod_histType")||{}).value || "";
+
+    // Gather all events: patient history entries + hodLog events
+    var events = [];
+    var cutoff = Date.now() - 30*24*60*60*1000;
+
+    // From hodLog (admit, discharge, handover)
+    if(state.hodLog){
+      state.hodLog.forEach(function(e){
+        if(new Date(e.time).getTime() < cutoff) return;
+        if(wardFilter && e.ward !== wardFilter) return;
+        if(typeFilter && e.type !== typeFilter) return;
+        events.push(e);
+      });
+    }
+
+    // From patient progress histories across all wards
+    if(!typeFilter || typeFilter === "progress"){
+      state.wardOrder.forEach(function(id){
+        var w = state.wards[id]; if(!w||!w.rooms) return;
+        if(wardFilter && w.name !== wardFilter) return;
+        Object.keys(w.rooms).forEach(function(bKey){
+          var p = w.rooms[bKey]; if(!p||!Array.isArray(p.history)) return;
+          p.history.forEach(function(h){
+            if(!h.time || new Date(h.time).getTime() < cutoff) return;
+            events.push({
+              type:"progress", time:h.time, by:h.updatedBy||"?",
+              ward:w.name,
+              detail: (p.name||bKey) + " — Acuity: " + (h.acuity||"?") +
+                      (h.situation ? " | " + h.situation.slice(0,80) : "") +
+                      (h.plan      ? " | Plan: " + h.plan.slice(0,60) : "")
+            });
+          });
+        });
+      });
+    }
+
+    // Sort newest first
+    events.sort(function(a,b){ return new Date(b.time) - new Date(a.time); });
+
+    if(events.length === 0){
+      container.innerHTML = '<div class="hist-empty">No entries found in the last 30 days.</div>';
+      return;
+    }
+
+    var html = "";
+    events.forEach(function(e){
+      html += '<div class="hist-entry">' +
+        '<div class="hist-entry-top">' +
+          '<span><span class="hist-entry-type '+e.type+'">'+e.type+'</span> ' +
+          '<span class="hist-entry-who">'+escapeHtml(e.by)+'</span></span>' +
+          '<span class="hist-entry-time">'+fmtTime(e.time)+'</span>' +
+        '</div>' +
+        '<div class="hist-entry-top" style="margin-top:2px;">' +
+          '<span class="hist-entry-ward">'+escapeHtml(e.ward||"")+'</span>' +
+        '</div>' +
+        (e.detail ? '<div class="hist-entry-body">'+escapeHtml(e.detail)+'</div>' : '') +
+        '</div>';
+    });
+    container.innerHTML = html;
+  }
+
+  // Re-render history when filters change
+  document.getElementById("hod_histWard").addEventListener("change", renderHodHistory);
+  document.getElementById("hod_histType").addEventListener("change", renderHodHistory);
+
+  /* Change PIN */
+  document.getElementById("hod_savePin").onclick = function(){
+    var np  = (document.getElementById("hod_newPin").value  ||"").trim();
+    var cp  = (document.getElementById("hod_confirmPin").value||"").trim();
+    var msg = document.getElementById("hod_pinMsg");
+    if(!np || np.length < 4){ msg.textContent="PIN must be at least 4 digits."; msg.style.color=var_red(); msg.style.display="block"; return; }
+    if(np !== cp){ msg.textContent="PINs do not match."; msg.style.color=var_red(); msg.style.display="block"; return; }
+    savePin(np);
+    document.getElementById("hod_newPin").value = "";
+    document.getElementById("hod_confirmPin").value = "";
+    msg.textContent = "✓ PIN updated successfully."; msg.style.color="var(--accent)"; msg.style.display="block";
+    setTimeout(function(){ msg.style.display="none"; }, 2500);
+  };
+  function var_red(){ return "var(--red)"; }
+
+  /* ============================================================ */
 
   /* Returns the staff name, or null if not set (callers must handle null) */
   function ensureStaffName(){
@@ -945,6 +1317,8 @@
     dischargeBtn.textContent = "Discharge";
     dischargeBtn.onclick = function(){
       if(confirm("Discharge patient from "+room+bed+"?")){
+        var dischargedName = (currentWard().rooms[bedKey(room,bed)]||{}).name || (room+bed);
+        hodLog("discharge", "Discharged: " + dischargedName + " from " + room+bed, currentWard().name);
         delete currentWard().rooms[bedKey(room,bed)];
         saveState(); render();
       }
@@ -1081,6 +1455,12 @@
         history: existing && existing.history ? existing.history : []
       };
 
+      var isNew = !existing;
+      hodLog(isNew ? "admit" : "edit",
+        (isNew ? "Admitted: " : "Updated: ") + (w.rooms[key].name || key) +
+        (w.rooms[key].diagnosis ? " — " + w.rooms[key].diagnosis : ""),
+        currentWard().name
+      );
       saveState();
       closePatientModal();
       render();
@@ -1156,6 +1536,13 @@
       patient.lastUpdatedBy = staffName;
       if(!patient.history) patient.history = [];
       patient.history.push(entry);
+      hodLog("progress",
+        (patient.name || currentBedForProgress.room + currentBedForProgress.bed) +
+        " — " + progressAcuity +
+        (entry.situation ? " | " + entry.situation.slice(0,80) : "") +
+        (entry.plan ? " | Plan: " + entry.plan.slice(0,60) : ""),
+        currentWard().name
+      );
       saveState();
       closeProgressModal();
       render();
@@ -1237,9 +1624,19 @@
   var closeHO = document.getElementById("closeHandoverModal");
   if(closeHO) closeHO.onclick = closeHandoverModal;
   var hoCurrent = document.getElementById("handoverCurrentBtn");
-  if(hoCurrent) hoCurrent.onclick = function(){ closeHandoverModal(); runSummaryPrint(activeWardId); };
+  if(hoCurrent) hoCurrent.onclick = function(){
+    closeHandoverModal();
+    hodLog("handover", "Handover exported — " + currentWard().name + " only", currentWard().name);
+    saveState();
+    runSummaryPrint(activeWardId);
+  };
   var hoAll = document.getElementById("handoverAllBtn");
-  if(hoAll) hoAll.onclick = function(){ closeHandoverModal(); runSummaryPrint(null); };
+  if(hoAll) hoAll.onclick = function(){
+    closeHandoverModal();
+    hodLog("handover", "Handover exported — all wards", "All");
+    saveState();
+    runSummaryPrint(null);
+  };
 
   /* Full Print Generator */
   function buildFullPrintHtml(){
