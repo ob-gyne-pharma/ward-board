@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Ward Board</title>
 <meta name="theme-color" content="#1a2430">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -290,7 +290,7 @@
 <header>
   <div class="brand">
     <span class="mark"></span>
-    <h1 id="appTitle" contenteditable="true" spellcheck="false" title="Tap to rename">Ward Board</h1>
+    <h1 id="appTitle" contenteditable="false" spellcheck="false" title="Double-click to rename">Ward Board</h1>
   </div>
   <div class="header-actions">
     <span id="clock"></span>
@@ -331,7 +331,7 @@
 
 <div id="grid"></div>
 
-<footer>For clinical use during duty</footer>
+<footer>For clinical use during duty &nbsp;·&nbsp; <span id="appVersion">v0.4 · test build</span></footer>
 
 <!-- ===== Modal: Add/Edit Patient ===== -->
 <div class="overlay" id="patientOverlay">
@@ -467,6 +467,26 @@
       <button class="btn-outline" id="cancelProgressModal">Cancel</button>
       <button class="btn-primary" id="saveProgressModal">Save Update</button>
     </div>
+  </div>
+</div>
+
+<!-- Handover Export Modal -->
+<div class="overlay" id="handoverOverlay">
+  <div class="modal" style="max-width:360px;">
+    <div class="modal-head">
+      <h2>Export Handover Summary</h2>
+      <button class="modal-close" id="closeHandoverModal">✕</button>
+    </div>
+    <div class="modal-body" style="padding:20px 24px 8px;">
+      <p style="margin:0 0 16px;font-size:0.95rem;color:var(--ink-soft);">What would you like to export?</p>
+      <button class="btn-primary" id="handoverCurrentBtn" style="width:100%;margin-bottom:10px;text-align:left;padding:12px 16px;">
+        📋 Current ward only<br><span style="font-size:0.8rem;font-weight:400;opacity:0.8;" id="handoverCurrentLabel"></span>
+      </button>
+      <button class="btn-outline" id="handoverAllBtn" style="width:100%;text-align:left;padding:12px 16px;">
+        📋 All wards combined
+      </button>
+    </div>
+    <div style="height:16px;"></div>
   </div>
 </div>
 
@@ -619,9 +639,30 @@
 
   var titleEl = document.getElementById("appTitle");
   if(titleEl){
+    // Double-click to unlock and rename
+    titleEl.addEventListener("dblclick", function(){
+      titleEl.contentEditable = "true";
+      titleEl.focus();
+      // Select all text so user can type immediately
+      var range = document.createRange();
+      range.selectNodeContents(titleEl);
+      var sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      titleEl.title = "Press Enter or click away to save";
+    });
+    // Save and lock on blur
     titleEl.addEventListener("blur", function(){
+      titleEl.contentEditable = "false";
+      titleEl.title = "Double-click to rename";
       state.appTitle = titleEl.textContent.trim() || "Ward Board";
+      titleEl.textContent = state.appTitle;
       saveState();
+    });
+    // Also save on Enter key
+    titleEl.addEventListener("keydown", function(e){
+      if(e.key === "Enter"){ e.preventDefault(); titleEl.blur(); }
+      if(e.key === "Escape"){ titleEl.textContent = state.appTitle || "Ward Board"; titleEl.blur(); }
     });
   }
 
@@ -1031,6 +1072,7 @@
         procedure: getVal("f_procedure"),
         drains: getVal("f_drains"),
         mobilisation: getVal("f_mobilisation"),
+        general: getVal("f_general"),
         labs: getVal("f_labs"),
         admitted: existing ? existing.admitted : nowISO(),
         addedBy: existing ? existing.addedBy : staffName,
@@ -1182,14 +1224,22 @@
   }
 
   var expSumBtn = document.getElementById("exportSummaryBtn");
+  var handoverOverlay = document.getElementById("handoverOverlay");
+  function closeHandoverModal(){ if(handoverOverlay) handoverOverlay.classList.remove("show"); }
   if(expSumBtn){
     expSumBtn.onclick = function(){
       var currentName = currentWard().name;
-      var choice = confirm('Export Handover Summary:\n\nOK = Just "'+currentName+'" (current ward)\nCancel = All wards combined');
-      if(choice){ runSummaryPrint(activeWardId); }
-      else { runSummaryPrint(null); }
+      var lbl = document.getElementById("handoverCurrentLabel");
+      if(lbl) lbl.textContent = currentName;
+      if(handoverOverlay) handoverOverlay.classList.add("show");
     };
   }
+  var closeHO = document.getElementById("closeHandoverModal");
+  if(closeHO) closeHO.onclick = closeHandoverModal;
+  var hoCurrent = document.getElementById("handoverCurrentBtn");
+  if(hoCurrent) hoCurrent.onclick = function(){ closeHandoverModal(); runSummaryPrint(activeWardId); };
+  var hoAll = document.getElementById("handoverAllBtn");
+  if(hoAll) hoAll.onclick = function(){ closeHandoverModal(); runSummaryPrint(null); };
 
   /* Full Print Generator */
   function buildFullPrintHtml(){
