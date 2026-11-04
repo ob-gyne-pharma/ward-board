@@ -8,6 +8,10 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Ward Board">
+<meta name="application-name" content="Ward Board">
+<meta name="description" content="OB-Gyne Ward Board — patient tracking and handover tool">
+<link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22Ward+Board%22%2C%22short_name%22%3A%22Ward+Board%22%2C%22description%22%3A%22OB-Gyne+ward+patient+board%22%2C%22start_url%22%3A%22.%2F%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%231a2430%22%2C%22theme_color%22%3A%22%231a2430%22%2C%22orientation%22%3A%22any%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%3Butf8%2C%253Csvg+xmlns%3D%2527http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%2527+viewBox%3D%25270+0+192+192%2527%253E%253Crect+width%3D%2527192%2527+height%3D%2527192%2527+rx%3D%252740%2527+fill%3D%2527%25231a2430%2527%2F%253E%253Ctext+x%3D%252796%2527+y%3D%2527130%2527+font-size%3D%2527110%2527+text-anchor%3D%2527middle%2527%253E%25F0%259F%25A5%25BC%253C%2Ftext%253E%253C%2Fsvg%253E%22%2C%22sizes%22%3A%22192x192%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%7D%5D%7D">
+<link rel="apple-touch-icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect width='180' height='180' rx='40' fill='%231a2430'/><text x='90' y='125' font-size='100' text-anchor='middle'>🩺</text></svg>">
 <style>
   :root{
     --ink:#1a2430; --ink-soft:#4a5a68; --line:#d7dee3; --line-soft:#e9edf0;
@@ -284,6 +288,48 @@
     .filter-row select, .filter-row input{flex:1;}
   }
 
+  /* Bell notification button */
+  .btn-notif{font-size:1rem;padding:4px 8px !important;position:relative;transition:opacity .2s;}
+  .btn-notif.notif-on{opacity:1;}
+  .btn-notif.notif-off{opacity:0.45;filter:grayscale(1);}
+  .btn-notif.notif-denied{opacity:0.3;filter:grayscale(1);}
+
+  /* Install prompt banner (Add to Home Screen) */
+  #installBanner{display:none;background:#0f6e5c;color:#fff;padding:12px 16px;font-size:0.85rem;line-height:1.5;position:relative;}
+  #installBanner strong{display:block;margin-bottom:3px;}
+  #installBanner .install-steps{margin:4px 0 8px;padding-left:16px;font-size:0.8rem;opacity:.9;}
+  #installBanner .install-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+  #installBanner .btn-install{background:#fff;color:#0f6e5c;border:none;border-radius:6px;padding:6px 14px;font-size:0.82rem;font-weight:600;cursor:pointer;}
+  #installBanner .btn-dismiss{background:transparent;color:#fff;border:1px solid rgba(255,255,255,0.4);border-radius:6px;padding:6px 12px;font-size:0.82rem;cursor:pointer;}
+  #installBanner .close-install{position:absolute;top:10px;right:12px;background:none;border:none;color:#fff;font-size:1.1rem;cursor:pointer;opacity:0.7;line-height:1;}
+
+  /* Overdue review badge */
+  .overdue-badge{display:inline-block;background:var(--red-soft);color:var(--red);font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;padding:2px 7px;border-radius:20px;margin-left:6px;animation:pulse-overdue 2s ease-in-out infinite;}
+  @keyframes pulse-overdue{0%,100%{opacity:1}50%{opacity:.55}}
+
+  /* Ward tab bed count */
+  .ward-tab-count{font-size:0.68rem;font-weight:400;opacity:0.7;margin-left:5px;}
+
+  /* Stats grid */
+  .stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin-bottom:18px;}
+  .stat-box{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:12px 14px;text-align:center;}
+  .stat-box .sn{font-size:1.6rem;font-weight:700;color:var(--ink);line-height:1;}
+  .stat-box .sl{font-size:0.72rem;color:var(--ink-soft);margin-top:4px;text-transform:uppercase;letter-spacing:0.04em;}
+  .stat-bar-wrap{margin-bottom:14px;}
+  .stat-bar-label{display:flex;justify-content:space-between;font-size:0.78rem;color:var(--ink-soft);margin-bottom:4px;}
+  .stat-bar-track{height:10px;background:var(--line-soft);border-radius:5px;overflow:hidden;}
+  .stat-bar-fill{height:100%;border-radius:5px;transition:width .4s;}
+
+  /* Discharge summary print */
+  .ds-block{margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--line-soft);}
+  .ds-block:last-child{border-bottom:none;}
+  .ds-label{font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--ink-soft);margin-bottom:3px;}
+  .ds-value{font-size:0.9rem;color:var(--ink);line-height:1.5;}
+  @media print{
+    #dischargeSummaryContent{font-size:11pt;line-height:1.6;}
+    .ds-label{font-size:8pt;}
+  }
+
   /* HOD Panel */
   .btn-hod{color:#e8c84a !important; border-color:rgba(232,200,74,0.35) !important;}
   .btn-hod:hover{background:rgba(232,200,74,0.12) !important;}
@@ -319,11 +365,32 @@
     <span id="clock"></span>
     <span id="cloudStatus" style="font-size:0.72rem; background:#293846; padding:3px 8px; border-radius:4px; color:#fbeae9;">☁️ Connecting...</span>
     <button class="btn-ghost btn-small" id="staffNameBtn">👤 Set name</button>
+    <button class="btn-ghost btn-small btn-notif" id="notifHeaderBtn" title="Enable urgent alerts on this device" aria-label="Enable notifications">🔔</button>
     <button class="btn-ghost btn-hod" id="hodBtn" style="display:none;">🔑 HOD</button>
     <button class="btn-ghost" id="exportSummaryBtn">Handover Summary</button>
     <button class="btn-ghost" id="printBtn">Full Print</button>
   </div>
 </header>
+
+<div id="offlineBanner" style="display:none;background:#8f1d18;color:#fff;text-align:center;font-size:0.82rem;padding:7px 16px;font-weight:500;">
+  ⚠️ You are offline — changes will sync automatically when reconnected.
+</div>
+
+<div id="installBanner">
+  <button class="close-install" id="closeInstallBanner" aria-label="Dismiss">✕</button>
+  <strong>📱 Add Ward Board to your Home Screen</strong>
+  <div>Get push notifications for urgent patients and a full-screen experience.</div>
+  <ol class="install-steps" id="installSteps">
+    <li>Tap the <strong>Share</strong> button at the bottom of Safari</li>
+    <li>Scroll down and tap <strong>"Add to Home Screen"</strong></li>
+    <li>Tap <strong>Add</strong> — done!</li>
+  </ol>
+  <div class="install-actions">
+    <button class="btn-install" id="installAppBtn" style="display:none;">Install App</button>
+    <button class="btn-dismiss" id="dismissInstallBanner">Remind me later</button>
+    <span style="font-size:0.75rem;opacity:0.75;" id="installNote"></span>
+  </div>
+</div>
 
 <div class="ward-tabs" id="wardTabs"></div>
 
@@ -494,6 +561,48 @@
   </div>
 </div>
 
+<!-- Discharge Summary Modal -->
+<div class="overlay" id="dischargeSummaryOverlay">
+  <div class="modal" style="max-width:580px;">
+    <div class="modal-head">
+      <h2>📄 Discharge Summary</h2>
+      <button class="modal-close" id="closeDischargeSummary">✕</button>
+    </div>
+    <div class="modal-body" style="padding:16px 24px 8px;">
+      <div id="dischargeSummaryContent" style="font-size:0.88rem;line-height:1.7;"></div>
+    </div>
+    <div class="modal-foot" style="gap:8px;">
+      <button class="btn-outline" id="cancelDischargeSummary">Close</button>
+      <button class="btn-outline" id="printDischargeSummary">🖨️ Print</button>
+      <button class="btn-danger-outline" id="confirmDischargeBtn">✓ Discharge Patient</button>
+    </div>
+  </div>
+</div>
+
+<!-- HOD Stats Modal -->
+<div class="overlay" id="hodStatsOverlay">
+  <div class="modal" style="max-width:600px;">
+    <div class="modal-head">
+      <h2>📊 Statistics Dashboard</h2>
+      <button class="modal-close" id="closeHodStats">✕</button>
+    </div>
+    <div class="modal-body" style="padding:16px 24px;">
+      <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
+        <label style="font-size:0.82rem;color:var(--ink-soft);">Period:</label>
+        <select id="statsPeriod" style="flex:1;min-width:120px;">
+          <option value="7">Last 7 days</option>
+          <option value="14">Last 14 days</option>
+          <option value="30" selected>Last 30 days</option>
+        </select>
+        <select id="statsWard" style="flex:1;min-width:120px;">
+          <option value="">All wards</option>
+        </select>
+      </div>
+      <div id="statsContent"></div>
+    </div>
+  </div>
+</div>
+
 <!-- HOD PIN Modal -->
 <div class="overlay" id="hodPinOverlay">
   <div class="modal" style="max-width:340px;">
@@ -558,6 +667,22 @@
           </select>
         </div>
         <div id="hod_histLog" style="max-height:280px;overflow-y:auto;border:1px solid var(--line);border-radius:8px;font-size:0.82rem;"></div>
+      </div>
+
+      <!-- Section: Stats -->
+      <div class="hod-section">
+        <div class="hod-section-title">📊 Statistics</div>
+        <button class="btn-primary" id="hod_statsBtn" style="width:100%;">Open Statistics Dashboard</button>
+      </div>
+
+      <!-- Section: Push Notifications -->
+      <div class="hod-section">
+        <div class="hod-section-title">🔔 Push Notifications (Urgent alerts)</div>
+        <p style="font-size:0.82rem;color:var(--ink-soft);margin:0 0 10px;">Get a device notification whenever a patient is marked Urgent.</p>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+          <button class="btn-outline" id="hod_notifBtn">Enable notifications on this device</button>
+          <span id="hod_notifStatus" style="font-size:0.8rem;color:var(--ink-soft);"></span>
+        </div>
       </div>
 
       <!-- Section: Change HOD PIN -->
@@ -1039,6 +1164,41 @@
   }
 
   /* Ward Tabs */
+  /* Overdue: returns true if nextReview time has passed */
+  function isOverdue(patient){
+    if(!patient || !patient.nextReview) return false;
+    var nr = patient.nextReview.trim();
+    if(!nr) return false;
+    // Try to parse a time like "14:30", "2:30 PM", "Tomorrow AM" etc.
+    var now = new Date();
+    // If it contains a colon, treat as today's HH:MM
+    var colonMatch = nr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+    if(colonMatch){
+      var h = parseInt(colonMatch[1],10);
+      var m = parseInt(colonMatch[2],10);
+      var ap = colonMatch[3] ? colonMatch[3].toUpperCase() : null;
+      if(ap === "PM" && h < 12) h += 12;
+      if(ap === "AM" && h === 12) h = 0;
+      var rev = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0);
+      return now > rev;
+    }
+    return false;
+  }
+
+  /* Track urgent patients to fire push notifications */
+  var _prevUrgentKeys = {};
+
+  function getWardOccupancy(wardId){
+    var w = state.wards[wardId]; if(!w||!w.rooms) return {occ:0,total:0};
+    var occ=0, total=0;
+    for(var r=1;r<=ROOMS_PER_WARD;r++){
+      var hasB = (w.roomConfig&&w.roomConfig[r]&&w.roomConfig[r].hasB)||!!w.rooms[r+"B"];
+      var beds = hasB?["A","B"]:["A"];
+      beds.forEach(function(b){ total++; if(w.rooms[r+b]) occ++; });
+    }
+    return {occ:occ,total:total};
+  }
+
   function renderWardTabs(){
     var wardTabsEl = document.getElementById("wardTabs");
     if(!wardTabsEl) return;
@@ -1046,9 +1206,10 @@
     state.wardOrder.forEach(function(id){
       var w = state.wards[id];
       if(!w) return;
+      var occ = getWardOccupancy(id);
       var tab = document.createElement("div");
       tab.className = "ward-tab" + (id===activeWardId ? " active" : "");
-      tab.textContent = w.name;
+      tab.innerHTML = escapeHtml(w.name) + '<span class="ward-tab-count">'+occ.occ+'/'+occ.total+'</span>';
       tab.onclick = function(){ activeWardId = id; render(); };
       wardTabsEl.appendChild(tab);
     });
@@ -1221,7 +1382,8 @@
     top.className = "bed-top";
     top.innerHTML = '<div class="bed-num"><span class="bar"></span>'+room+bed+'</div>';
     if(patient){
-      top.innerHTML += '<div class="tag-row"><span class="tag acuity-'+patient.acuity+'">'+(ACUITY_LABEL[patient.acuity]||"Stable")+'</span><span class="tag type-'+patient.type+'">'+(TYPE_LABEL[patient.type]||"Antenatal")+'</span>'+(patient.unit?'<span class="tag unit-tag">Unit '+escapeHtml(patient.unit)+'</span>':'')+'</div>';
+      var overdueBadge = isOverdue(patient) ? '<span class="overdue-badge">⏰ Review overdue</span>' : '';
+      top.innerHTML += '<div class="tag-row"><span class="tag acuity-'+patient.acuity+'">'+(ACUITY_LABEL[patient.acuity]||"Stable")+'</span><span class="tag type-'+patient.type+'">'+(TYPE_LABEL[patient.type]||"Antenatal")+'</span>'+(patient.unit?'<span class="tag unit-tag">Unit '+escapeHtml(patient.unit)+'</span>':'')+'</div>'+overdueBadge;
     }
     card.appendChild(top);
 
@@ -1316,12 +1478,7 @@
     dischargeBtn.className = "btn-danger-outline";
     dischargeBtn.textContent = "Discharge";
     dischargeBtn.onclick = function(){
-      if(confirm("Discharge patient from "+room+bed+"?")){
-        var dischargedName = (currentWard().rooms[bedKey(room,bed)]||{}).name || (room+bed);
-        hodLog("discharge", "Discharged: " + dischargedName + " from " + room+bed, currentWard().name);
-        delete currentWard().rooms[bedKey(room,bed)];
-        saveState(); render();
-      }
+      openDischargeSummary(room, bed);
     };
 
     actions.appendChild(updateBtn);
@@ -1689,6 +1846,13 @@
     };
   }
 
+  /* Hook urgent notification check into every render */
+  var _origRender = render;
+  render = function(){
+    _origRender();
+    checkUrgentNotifications();
+  };
+
   var searchBox = document.getElementById("searchBox");
   var unitFilter = document.getElementById("unitFilter");
   var typeFilter = document.getElementById("typeFilter");
@@ -1732,8 +1896,365 @@
     }
   };
 
+  /* ============================================================
+     FEATURE: DISCHARGE SUMMARY
+  ============================================================ */
+  var _pendingDischarge = null;
+
+  function openDischargeSummary(room, bed){
+    var w = currentWard();
+    var patient = w.rooms[bedKey(room, bed)];
+    if(!patient) return;
+    _pendingDischarge = {room:room, bed:bed};
+
+    var lastEntry = patient.history && patient.history.length ? patient.history[patient.history.length-1] : null;
+    var situation = lastEntry ? lastEntry.situation : patient.situation;
+    var plan      = lastEntry ? lastEntry.plan      : patient.plan;
+
+    function row(label, value){
+      return '<div class="ds-block"><div class="ds-label">'+label+'</div><div class="ds-value">'+(value ? escapeHtml(value) : '<em style="color:var(--ink-soft)">Not recorded</em>')+'</div></div>';
+    }
+
+    var html =
+      '<div style="text-align:center;margin-bottom:16px;">' +
+        '<div style="font-size:1rem;font-weight:600;">'+escapeHtml(w.name)+' — Bed '+room+bed+'</div>' +
+        '<div style="font-size:0.78rem;color:var(--ink-soft);">Discharge note generated '+fmtTime(nowISO())+'</div>' +
+      '</div>' +
+      row("Patient name / initials", patient.name) +
+      row("Age / gravida/parity", patient.age) +
+      row("Patient type", TYPE_LABEL[patient.type] || patient.type) +
+      row("Unit / consultant", patient.unit) +
+      row("Diagnosis / indication", patient.diagnosis) +
+      (patient.type==="antenatal" ? row("Gestation", patient.gestation) + row("Indication", patient.indication) + row("Fetal monitoring", patient.fetal) : "") +
+      (patient.type==="postnatal" ? row("Mode of delivery", patient.modeDelivery) + row("Day post-delivery", patient.dayPostDelivery) + row("Baby", patient.baby) + row("VTE status", patient.vte) : "") +
+      (patient.type==="gynae"     ? row("Procedure", patient.procedure) + row("Drains", patient.drains) + row("Mobilisation", patient.mobilisation) : "") +
+      row("Final situation", situation) +
+      row("Discharge plan", plan) +
+      row("General notes", patient.general) +
+      row("Labs / investigations", patient.labs) +
+      row("Admitted", fmtTime(patient.admitted) + " by " + (patient.addedBy||"Staff")) +
+      row("Admitted by", patient.addedBy) +
+      row("Discharged by", getStaffName()||"Staff") +
+      '<div class="ds-block"><div class="ds-label">Safety checklist at discharge</div><div class="ds-value">' +
+        (patient.checklist ? [
+          patient.checklist.vte  ? "✓ VTE assessed" : "✗ VTE not checked",
+          patient.checklist.edd  ? "✓ EDD/Gestation confirmed" : "✗ EDD/Gestation not confirmed",
+          patient.checklist.consult ? "✓ Consultant updated" : "✗ Consultant not updated"
+        ].join(" &nbsp;·&nbsp; ") : "Not recorded") +
+      '</div></div>';
+
+    document.getElementById("dischargeSummaryContent").innerHTML = html;
+    document.getElementById("dischargeSummaryOverlay").classList.add("show");
+  }
+
+  document.getElementById("closeDischargeSummary").onclick  = function(){ document.getElementById("dischargeSummaryOverlay").classList.remove("show"); _pendingDischarge=null; };
+  document.getElementById("cancelDischargeSummary").onclick = function(){ document.getElementById("dischargeSummaryOverlay").classList.remove("show"); _pendingDischarge=null; };
+
+  document.getElementById("printDischargeSummary").onclick = function(){
+    var content = document.getElementById("dischargeSummaryContent").innerHTML;
+    var win = window.open("","_blank","width=700,height=900");
+    win.document.write('<html><head><title>Discharge Summary</title><style>body{font-family:sans-serif;padding:32px;font-size:11pt;line-height:1.6}.ds-label{font-size:8pt;text-transform:uppercase;letter-spacing:.05em;color:#666;margin-bottom:2px}.ds-value{font-size:11pt;margin-bottom:12px;border-bottom:1px solid #eee;padding-bottom:8px}</style></head><body>'+content+'</body></html>');
+    win.document.close();
+    win.focus();
+    setTimeout(function(){ win.print(); }, 300);
+  };
+
+  document.getElementById("confirmDischargeBtn").onclick = function(){
+    if(!_pendingDischarge) return;
+    var room = _pendingDischarge.room, bed = _pendingDischarge.bed;
+    var dischargedName = (currentWard().rooms[bedKey(room,bed)]||{}).name || (room+bed);
+    hodLog("discharge","Discharged: "+dischargedName+" from "+room+bed, currentWard().name);
+    delete currentWard().rooms[bedKey(room,bed)];
+    saveState();
+    document.getElementById("dischargeSummaryOverlay").classList.remove("show");
+    _pendingDischarge = null;
+    render();
+  };
+
+
+  /* ============================================================
+     FEATURE: HOD STATISTICS DASHBOARD
+  ============================================================ */
+  function openHodStats(){
+    var sel = document.getElementById("statsWard");
+    if(sel){
+      sel.innerHTML = '<option value="">All wards</option>';
+      state.wardOrder.forEach(function(id){
+        var w = state.wards[id]; if(!w) return;
+        var o = document.createElement("option"); o.value = id; o.textContent = w.name;
+        sel.appendChild(o);
+      });
+    }
+    renderStats();
+    document.getElementById("hodStatsOverlay").classList.add("show");
+  }
+
+  document.getElementById("closeHodStats").onclick = function(){ document.getElementById("hodStatsOverlay").classList.remove("show"); };
+  document.getElementById("statsPeriod").addEventListener("change", renderStats);
+  document.getElementById("statsWard").addEventListener("change", renderStats);
+
+  function renderStats(){
+    var days    = parseInt(document.getElementById("statsPeriod").value||"30", 10);
+    var wardId  = document.getElementById("statsWard").value || "";
+    var cutoff  = Date.now() - days*24*60*60*1000;
+    var log     = (state.hodLog||[]).filter(function(e){ return new Date(e.time).getTime() >= cutoff && (!wardId || (state.wards[wardId] && e.ward === state.wards[wardId].name)); });
+
+    var admits    = log.filter(function(e){ return e.type==="admit"; }).length;
+    var discharges= log.filter(function(e){ return e.type==="discharge"; }).length;
+    var updates   = log.filter(function(e){ return e.type==="progress"; }).length;
+    var handovers = log.filter(function(e){ return e.type==="handover"; }).length;
+
+    // Current patients in chosen ward(s)
+    var currentAntenatal=0, currentPostnatal=0, currentGynae=0, currentUrgent=0;
+    var wards = wardId ? [wardId] : state.wardOrder;
+    wards.forEach(function(id){
+      var w = state.wards[id]; if(!w||!w.rooms) return;
+      Object.values(w.rooms).forEach(function(p){
+        if(!p) return;
+        if(p.type==="antenatal") currentAntenatal++;
+        else if(p.type==="postnatal") currentPostnatal++;
+        else if(p.type==="gynae") currentGynae++;
+        if(p.acuity==="urgent") currentUrgent++;
+      });
+    });
+    var currentTotal = currentAntenatal + currentPostnatal + currentGynae;
+
+    // Staff activity from log
+    var staffCounts = {};
+    log.forEach(function(e){ if(e.by){ staffCounts[e.by] = (staffCounts[e.by]||0)+1; } });
+    var topStaff = Object.entries(staffCounts).sort(function(a,b){ return b[1]-a[1]; }).slice(0,5);
+
+    function pct(n){ return currentTotal ? Math.round(n/currentTotal*100) : 0; }
+    function bar(label, n, color){
+      return '<div class="stat-bar-wrap"><div class="stat-bar-label"><span>'+escapeHtml(label)+'</span><span>'+n+'</span></div><div class="stat-bar-track"><div class="stat-bar-fill" style="width:'+pct(n)+'%;background:'+color+';"></div></div></div>';
+    }
+
+    var html =
+      '<div class="stats-grid">' +
+        '<div class="stat-box"><div class="sn">'+currentTotal+'</div><div class="sl">Current patients</div></div>' +
+        '<div class="stat-box"><div class="sn" style="color:var(--accent)">'+admits+'</div><div class="sl">Admissions</div></div>' +
+        '<div class="stat-box"><div class="sn" style="color:var(--red)">'+discharges+'</div><div class="sl">Discharges</div></div>' +
+        '<div class="stat-box"><div class="sn" style="color:var(--amber)">'+currentUrgent+'</div><div class="sl">Urgent now</div></div>' +
+        '<div class="stat-box"><div class="sn">'+updates+'</div><div class="sl">Progress notes</div></div>' +
+        '<div class="stat-box"><div class="sn">'+handovers+'</div><div class="sl">Handovers</div></div>' +
+      '</div>' +
+      '<div style="font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--ink-soft);margin-bottom:8px;">Current patient mix</div>' +
+      bar("Antenatal", currentAntenatal, "var(--accent)") +
+      bar("Postnatal",  currentPostnatal, "var(--purple)") +
+      bar("Gynaecology", currentGynae, "#b5580d") +
+      '<div style="font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--ink-soft);margin:14px 0 8px;">Most active staff (last '+days+' days)</div>';
+
+    if(topStaff.length === 0){
+      html += '<div style="color:var(--ink-soft);font-size:0.85rem;">No activity recorded yet.</div>';
+    } else {
+      var maxActivity = topStaff[0][1] || 1;
+      topStaff.forEach(function(s){
+        html += '<div class="stat-bar-wrap"><div class="stat-bar-label"><span>'+escapeHtml(s[0])+'</span><span>'+s[1]+' actions</span></div><div class="stat-bar-track"><div class="stat-bar-fill" style="width:'+Math.round(s[1]/maxActivity*100)+'%;background:var(--accent);"></div></div></div>';
+      });
+    }
+
+    document.getElementById("statsContent").innerHTML = html;
+  }
+
+  // Wire HOD panel → stats button
+  document.getElementById("hod_statsBtn").onclick = function(){
+    document.getElementById("hodPanelOverlay").classList.remove("show");
+    openHodStats();
+  };
+
+
+  /* ============================================================
+     FEATURE: PUSH NOTIFICATIONS — header bell for ALL staff
+  ============================================================ */
+  var INSTALL_DISMISSED_KEY = "wb_install_dismissed";
+  var _deferredInstallPrompt = null;
+
+  /* Capture the browser's native "install" event (Android Chrome) */
+  window.addEventListener("beforeinstallprompt", function(e){
+    e.preventDefault();
+    _deferredInstallPrompt = e;
+    var btn = document.getElementById("installAppBtn");
+    if(btn) btn.style.display = "inline-block";
+  });
+
+  /* Update bell button appearance for all staff */
+  function updateNotifStatus(){
+    var headerBtn = document.getElementById("notifHeaderBtn");
+    var hodEl  = document.getElementById("hod_notifStatus");
+    var hodBtn = document.getElementById("hod_notifBtn");
+    var supported = "Notification" in window;
+
+    if(!supported){
+      if(headerBtn){ headerBtn.className = "btn-ghost btn-small btn-notif notif-denied"; headerBtn.title = "Notifications not supported on this browser"; }
+      if(hodEl) hodEl.textContent = "Not supported on this browser.";
+      if(hodBtn){ hodBtn.disabled = true; hodBtn.textContent = "Not supported"; }
+      return;
+    }
+
+    var perm = Notification.permission;
+    if(headerBtn){
+      headerBtn.classList.remove("notif-on","notif-off","notif-denied");
+      if(perm === "granted"){
+        headerBtn.classList.add("notif-on");
+        headerBtn.title = "🔔 Urgent alerts ON — tap to manage";
+      } else if(perm === "denied"){
+        headerBtn.classList.add("notif-denied");
+        headerBtn.title = "Notifications blocked — allow in browser settings";
+      } else {
+        headerBtn.classList.add("notif-off");
+        headerBtn.title = "Tap to enable urgent patient alerts";
+      }
+    }
+    if(hodEl) hodEl.textContent = perm==="granted" ? "✓ Enabled on this device" : perm==="denied" ? "Blocked — allow in browser settings" : "Not yet enabled";
+    if(hodBtn) hodBtn.textContent = perm==="granted" ? "✓ Alerts enabled" : "Enable notifications on this device";
+  }
+
+  function requestNotifPermission(callback){
+    if(!("Notification" in window)) return;
+    if(Notification.permission === "granted"){ if(callback) callback("granted"); return; }
+    if(Notification.permission === "denied"){
+      alert("Notifications are blocked.\n\nTo enable:\n• iPhone: Settings → Safari → [this site] → Notifications → Allow\n• Android: Browser settings → Notifications → Allow\n• Desktop: Click the lock icon in the address bar");
+      return;
+    }
+    Notification.requestPermission().then(function(perm){
+      updateNotifStatus();
+      if(perm === "granted"){
+        new Notification("🔔 Ward Board", { body: "Urgent patient alerts are now active on this device.", tag:"wb-welcome" });
+      }
+      if(callback) callback(perm);
+    });
+  }
+
+  /* Header bell — for ALL staff */
+  var notifHeaderBtn = document.getElementById("notifHeaderBtn");
+  if(notifHeaderBtn){
+    notifHeaderBtn.onclick = function(){
+      if(!("Notification" in window)){
+        alert("Push notifications are not supported on this browser.\n\nFor best results, use Chrome on Android or Safari on iPhone with the app added to your Home Screen.");
+        return;
+      }
+      if(Notification.permission === "granted"){
+        // Already on — show status
+        alert("✓ Urgent patient alerts are active on this device.\n\nYou will receive a notification whenever a patient is marked Urgent.\n\nTo disable, go to your device/browser notification settings.");
+        return;
+      }
+      requestNotifPermission(null);
+    };
+  }
+
+  /* HOD panel button — same action */
+  document.getElementById("hod_notifBtn").onclick = function(){
+    requestNotifPermission(null);
+  };
+
+  /* ============================================================
+     INSTALL PROMPT — Add to Home Screen guide
+  ============================================================ */
+  function isStandalone(){
+    return window.navigator.standalone === true ||
+           window.matchMedia("(display-mode: standalone)").matches;
+  }
+  function isIOS(){
+    return /iphone|ipad|ipod/i.test(navigator.userAgent);
+  }
+
+  function showInstallBanner(){
+    var banner = document.getElementById("installBanner");
+    if(!banner) return;
+    // Adjust instructions for platform
+    var steps = document.getElementById("installSteps");
+    var note  = document.getElementById("installNote");
+    var installBtn = document.getElementById("installAppBtn");
+    if(isIOS()){
+      if(steps) steps.innerHTML =
+        "<li>Tap the <strong>Share ⬆️</strong> button at the bottom of Safari</li>" +
+        "<li>Scroll down and tap <strong>\"Add to Home Screen\"</strong></li>" +
+        "<li>Tap <strong>Add</strong> — done!</li>";
+      if(note) note.textContent = "Requires iOS 16.4+ for push notifications";
+    } else if(_deferredInstallPrompt){
+      if(steps) steps.innerHTML = "<li>Tap <strong>Install App</strong> below</li><li>Confirm in the popup</li>";
+      if(installBtn) installBtn.style.display = "inline-block";
+    } else {
+      if(steps) steps.innerHTML =
+        "<li>Open the browser menu (⋮)</li>" +
+        "<li>Tap <strong>\"Add to Home screen\"</strong> or <strong>\"Install app\"</strong></li>";
+    }
+    banner.style.display = "block";
+  }
+
+  function hideInstallBanner(){
+    var b = document.getElementById("installBanner");
+    if(b) b.style.display = "none";
+  }
+
+  document.getElementById("closeInstallBanner").onclick  = function(){ hideInstallBanner(); localStorage.setItem(INSTALL_DISMISSED_KEY,"1"); };
+  document.getElementById("dismissInstallBanner").onclick = function(){ hideInstallBanner(); localStorage.setItem(INSTALL_DISMISSED_KEY,"1"); };
+  document.getElementById("installAppBtn").onclick = function(){
+    if(!_deferredInstallPrompt) return;
+    _deferredInstallPrompt.prompt();
+    _deferredInstallPrompt.userChoice.then(function(r){
+      if(r.outcome === "accepted") hideInstallBanner();
+      _deferredInstallPrompt = null;
+    });
+  };
+
+  /* Show install banner once — if not already installed and not dismissed */
+  (function(){
+    if(isStandalone()) return;                                    // already installed
+    if(localStorage.getItem(INSTALL_DISMISSED_KEY)) return;      // user dismissed
+    // Show after 5 seconds so it doesn't interrupt first load
+    setTimeout(showInstallBanner, 5000);
+  })();
+
+  /* Fire a notification when a patient transitions to Urgent */
+  function checkUrgentNotifications(){
+    if(!("Notification" in window) || Notification.permission !== "granted") return;
+    var newUrgentKeys = {};
+    state.wardOrder.forEach(function(id){
+      var w = state.wards[id]; if(!w||!w.rooms) return;
+      Object.keys(w.rooms).forEach(function(bKey){
+        var p = w.rooms[bKey];
+        if(p && p.acuity === "urgent"){
+          var key = id + "_" + bKey;
+          newUrgentKeys[key] = p.name || bKey;
+          if(!_prevUrgentKeys[key]){
+            new Notification("⚠️ Urgent patient — " + w.name, {
+              body: (p.name||bKey) + " marked URGENT" + (p.diagnosis?" ("+p.diagnosis+")":""),
+              tag: key
+            });
+          }
+        }
+      });
+    });
+    _prevUrgentKeys = newUrgentKeys;
+  }
+
+
+  /* ============================================================
+     FEATURE: OFFLINE BANNER
+  ============================================================ */
+  window.setOfflineBanner = function(offline){
+    var b = document.getElementById("offlineBanner");
+    if(b) b.style.display = offline ? "block" : "none";
+  };
+  window.addEventListener("online",  function(){ window.setOfflineBanner(false); });
+  window.addEventListener("offline", function(){ window.setOfflineBanner(true); });
+  if(!navigator.onLine) setOfflineBanner(true);
+
+
+  /* ============================================================
+     OVERDUE: re-check every 60 seconds and re-render if needed
+  ============================================================ */
+  setInterval(function(){
+    var w = currentWard(); if(!w||!w.rooms) return;
+    var anyOverdue = Object.values(w.rooms).some(function(p){ return p && isOverdue(p); });
+    if(anyOverdue) render();
+  }, 60000);
+
+
   loadState();
   if(getStaffName() && staffBtn){ staffBtn.textContent = "👤 " + getStaffName(); }
+  updateNotifStatus();
   render();
 
 })();
@@ -1789,6 +2310,7 @@
         statusEl.textContent = "⚡ Live Sync Active";
         statusEl.style.color = "#a2f2c8";
       }
+      if(window.setOfflineBanner) window.setOfflineBanner(false);
       if(window.handleRemoteState){
         window.handleRemoteState(snapshot.val());
       }
@@ -1798,6 +2320,7 @@
         statusEl.textContent = "❌ Sync Error";
         statusEl.style.color = "#ffb3b3";
       }
+      if(window.setOfflineBanner) window.setOfflineBanner(true);
     });
 
     document.addEventListener("visibilitychange", function() {
