@@ -524,6 +524,78 @@
     #cloudStatus { display: none; }
   }
 
+  /* ── Dark mode ─────────────────────────────────────────────── */
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ink:         #e8edf1;
+      --ink-2:       #c8d4dc;
+      --ink-soft:    #8da0ae;
+      --ink-mute:    #5a6e7c;
+      --line:        #2a3a46;
+      --line-soft:   #1e2d38;
+      --paper:       #121e28;
+      --card:        #182331;
+      --header-bg:   #0a1520;
+      --header-2:    #0f1e2a;
+
+      --accent:      #12a088;
+      --accent-mid:  #0e8a76;
+      --accent-soft: #0d2e28;
+      --accent-pale: #0a2420;
+
+      --red:         #f26b62;
+      --red-soft:    #2a1210;
+      --red-mid:     #6b2820;
+      --amber:       #e09040;
+      --amber-soft:  #2a1e08;
+      --amber-mid:   #6b4010;
+      --blue:        #5a9fd4;
+      --blue-soft:   #0e1e30;
+      --purple:      #9b7de0;
+      --purple-soft: #1a1030;
+      --gynae:       #e08050;
+      --gynae-soft:  #2a1408;
+    }
+    body::before { background: var(--header-bg); }
+    select, input, textarea {
+      background: #1a2d3a !important;
+      color: var(--ink) !important;
+      -webkit-text-fill-color: var(--ink);
+      border-color: var(--line);
+    }
+    .modal { background: var(--card); border-color: var(--line); }
+    .modal-foot { background: var(--paper); }
+    .btn-outline { background: var(--card); color: var(--ink-2); border-color: var(--line); }
+    .btn-outline:hover { background: var(--line-soft); }
+    .btn-danger-outline { background: var(--card); color: var(--red); border-color: var(--red-mid); }
+    .btn-danger-outline:hover { background: var(--red-soft); }
+    .modal-close { background: var(--line-soft); color: var(--ink-soft); border-color: var(--line); }
+    .modal-close:hover { background: var(--red-soft); color: var(--red); }
+    .checklist-grid { background: var(--accent-pale); border-color: #1a4038; }
+    .floor-map-bar { background: var(--card); border-color: var(--line); }
+    .ward-tabs { background: var(--header-2); }
+    .toolbar { background: var(--card); border-color: var(--line); }
+    .bed-card { background: var(--card); border-color: var(--line); }
+    .bed-card.empty { background: #101c28; border-color: #1e2d38; }
+    .bed-top { background: transparent; }
+    .bed-actions { background: var(--paper); border-color: var(--line); }
+    .admit-row { background: var(--paper); border-color: var(--line-soft); }
+    .history-entry { background: var(--paper); border-color: var(--line); }
+    .quick-note-banner { background: var(--accent-soft); border-color: #1a4038; }
+    .pill { background: var(--line-soft); color: var(--ink-soft); }
+    .pill.occ    { background: var(--accent-soft); color: var(--accent); }
+    .pill.urgent { background: var(--red-soft);    color: var(--red); }
+    .pill.review { background: var(--amber-soft);  color: var(--amber); }
+    .pill.stable { background: var(--blue-soft);   color: var(--blue); }
+    .stat-box { background: var(--card); border-color: var(--line); }
+    .hod-section { border-color: var(--line); }
+    .hist-entry { border-color: var(--line); }
+    #installBanner { background: #0a3028; }
+    #offlineBanner { background: #4a1210; }
+    footer { border-color: var(--line); }
+    input[type="time"]::-webkit-calendar-picker-indicator { filter: invert(1); }
+  }
+
   /* Bell notification button */
   .btn-notif{font-size:1rem;padding:4px 8px !important;position:relative;transition:opacity .2s;}
   .btn-notif.notif-on{opacity:1;}
@@ -659,7 +731,7 @@
 <div id="grid"></div>
 
 <footer>
-  <div style="margin-bottom:4px;">🩺 Ward Board &nbsp;·&nbsp; <span id="appVersion">v0.5 · test build</span></div>
+  <div style="margin-bottom:4px;">🩺 Ward Board &nbsp;·&nbsp; <span id="appVersion">v0.6 · test build</span></div>
   <div>For clinical workflow support during duty — not a substitute for the EHR</div>
 </footer>
 
@@ -761,7 +833,18 @@
 
       <div class="section-divider">General</div>
       <div class="form-field" style="margin-top:10px;"><label>Plan</label><textarea id="f_plan"></textarea></div>
-      <div class="form-field"><label>Next review</label><input type="text" id="f_nextReview" placeholder="e.g. Tomorrow AM round"></div>
+      <div class="form-field">
+        <label>Next review time</label>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <input type="time" id="f_nextReview" style="flex:0 0 auto;width:140px;">
+          <select id="f_nextReviewDay" style="flex:1;min-width:130px;">
+            <option value="today">Today</option>
+            <option value="tomorrow">Tomorrow</option>
+          </select>
+          <button type="button" class="btn-outline" id="f_clearReview" style="font-size:0.72rem;padding:5px 9px;white-space:nowrap;">Clear</button>
+        </div>
+        <div id="f_reviewPreview" style="font-size:0.75rem;color:var(--ink-soft);margin-top:4px;"></div>
+      </div>
     </div>
     <div id="patientSaveError" role="alert" aria-live="polite" style="display:none;margin:0 16px 8px;padding:10px 12px;border-radius:8px;background:#fbeae9;color:#8f1d18;font-size:0.9rem;"></div>
     <div class="modal-foot">
@@ -790,12 +873,125 @@
       </div>
       <div class="form-field"><label>Current situation</label><textarea id="p_situation"></textarea></div>
       <div class="form-field"><label>Plan</label><textarea id="p_plan"></textarea></div>
-      <div class="form-field"><label>Next review</label><input type="text" id="p_nextReview" placeholder="e.g. Tomorrow AM round"></div>
+      <div class="form-field">
+        <label>Next review time</label>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <input type="time" id="p_nextReview" style="flex:0 0 auto;width:140px;">
+          <select id="p_nextReviewDay" style="flex:1;min-width:130px;">
+            <option value="today">Today</option>
+            <option value="tomorrow">Tomorrow</option>
+          </select>
+          <button type="button" class="btn-outline" id="p_clearReview" style="font-size:0.72rem;padding:5px 9px;white-space:nowrap;">Clear</button>
+        </div>
+        <div id="p_reviewPreview" style="font-size:0.75rem;color:var(--ink-soft);margin-top:4px;"></div>
+      </div>
     </div>
     <div id="progressSaveError" role="alert" aria-live="polite" style="display:none;margin:0 16px 8px;padding:10px 12px;border-radius:8px;background:#fbeae9;color:#8f1d18;font-size:0.9rem;"></div>
     <div class="modal-foot">
       <button class="btn-outline" id="cancelProgressModal">Cancel</button>
       <button class="btn-primary" id="saveProgressModal">Save Update</button>
+    </div>
+  </div>
+</div>
+
+<!-- Set Name Modal -->
+<div class="overlay" id="setNameOverlay">
+  <div class="modal" style="max-width:380px;">
+    <div class="modal-head">
+      <h2>👤 Your name</h2>
+      <button class="modal-close" id="closeSetName">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="margin:0;font-size:0.88rem;color:var(--ink-soft);">Your name or initials appear on every patient update you make.</p>
+      <div class="form-field">
+        <label>Name / Initials</label>
+        <input type="text" id="setNameInput" placeholder="e.g. Dr Ahmed" maxlength="40" autocomplete="off">
+      </div>
+      <div id="setNameError" style="display:none;color:var(--red);font-size:0.82rem;"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-outline" id="cancelSetName">Cancel</button>
+      <button class="btn-primary" id="confirmSetName">Save name</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Ward Modal -->
+<div class="overlay" id="addWardOverlay">
+  <div class="modal" style="max-width:380px;">
+    <div class="modal-head">
+      <h2>➕ Add ward</h2>
+      <button class="modal-close" id="closeAddWard">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-field">
+        <label>Ward name</label>
+        <input type="text" id="addWardInput" placeholder="e.g. Antenatal Ward" maxlength="40">
+      </div>
+      <div id="addWardError" style="display:none;color:var(--red);font-size:0.82rem;"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-outline" id="cancelAddWard">Cancel</button>
+      <button class="btn-primary" id="confirmAddWard">Add ward</button>
+    </div>
+  </div>
+</div>
+
+<!-- Generic Confirm Modal -->
+<div class="overlay" id="confirmOverlay">
+  <div class="modal" style="max-width:360px;">
+    <div class="modal-head">
+      <h2 id="confirmTitle">Confirm</h2>
+      <button class="modal-close" id="closeConfirm">✕</button>
+    </div>
+    <div class="modal-body">
+      <p id="confirmMsg" style="margin:0;font-size:0.9rem;line-height:1.6;color:var(--ink-2);"></p>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-outline" id="cancelConfirm">Cancel</button>
+      <button class="btn-danger-outline" id="okConfirm">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- Notification Info Modal -->
+<div class="overlay" id="notifInfoOverlay">
+  <div class="modal" style="max-width:400px;">
+    <div class="modal-head">
+      <h2 id="notifInfoTitle">🔔 Notifications</h2>
+      <button class="modal-close" id="closeNotifInfo">✕</button>
+    </div>
+    <div class="modal-body">
+      <p id="notifInfoMsg" style="margin:0;font-size:0.88rem;line-height:1.65;color:var(--ink-2);white-space:pre-line;"></p>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-primary" id="okNotifInfo">OK</button>
+    </div>
+  </div>
+</div>
+
+<!-- Transfer Patient Modal -->
+<div class="overlay" id="transferOverlay">
+  <div class="modal" style="max-width:400px;">
+    <div class="modal-head">
+      <h2>🔀 Transfer patient</h2>
+      <button class="modal-close" id="closeTransfer">✕</button>
+    </div>
+    <div class="modal-body">
+      <p id="transferPatientLabel" style="margin:0 0 14px;font-size:0.88rem;font-weight:600;color:var(--ink);"></p>
+      <div class="form-field">
+        <label>Transfer to ward</label>
+        <select id="transferWardSelect"></select>
+      </div>
+      <div class="form-field">
+        <label>Bed in destination ward</label>
+        <select id="transferBedSelect"></select>
+      </div>
+      <div id="transferError" style="display:none;color:var(--red);font-size:0.82rem;margin-top:4px;"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-outline" id="cancelTransfer">Cancel</button>
+      <button class="btn-primary" id="confirmTransfer">Transfer</button>
     </div>
   </div>
 </div>
@@ -1355,22 +1551,98 @@
     if(el){ el.style.display = "none"; el.textContent = ""; }
   }
 
+  /* ============================================================
+     MODAL HELPERS — replace all browser prompt/alert/confirm
+  ============================================================ */
+
+  /* Generic confirm modal */
+  var _confirmCallback = null;
+  function showConfirm(title, msg, okLabel, okClass, cb){
+    document.getElementById("confirmTitle").textContent = title;
+    document.getElementById("confirmMsg").textContent   = msg;
+    var okBtn = document.getElementById("okConfirm");
+    okBtn.textContent  = okLabel || "Confirm";
+    okBtn.className    = okClass || "btn-danger-outline";
+    _confirmCallback   = cb;
+    document.getElementById("confirmOverlay").classList.add("show");
+  }
+  function closeConfirmModal(){ document.getElementById("confirmOverlay").classList.remove("show"); _confirmCallback = null; }
+  document.getElementById("closeConfirm").onclick  = closeConfirmModal;
+  document.getElementById("cancelConfirm").onclick = closeConfirmModal;
+  document.getElementById("okConfirm").onclick = function(){
+    closeConfirmModal();
+    if(_confirmCallback) _confirmCallback();
+  };
+
+  /* Notification info modal (replaces alert) */
+  function showNotifInfo(title, msg){
+    document.getElementById("notifInfoTitle").textContent = title;
+    document.getElementById("notifInfoMsg").textContent   = msg;
+    document.getElementById("notifInfoOverlay").classList.add("show");
+  }
+  document.getElementById("closeNotifInfo").onclick = function(){ document.getElementById("notifInfoOverlay").classList.remove("show"); };
+  document.getElementById("okNotifInfo").onclick    = function(){ document.getElementById("notifInfoOverlay").classList.remove("show"); };
+
+  /* Set Name Modal */
+  function openSetNameModal(){
+    var inp = document.getElementById("setNameInput");
+    var err = document.getElementById("setNameError");
+    if(inp) inp.value = getStaffName() || "";
+    if(err){ err.style.display="none"; err.textContent=""; }
+    document.getElementById("setNameOverlay").classList.add("show");
+    setTimeout(function(){ if(inp) inp.focus(); }, 120);
+  }
+  function closeSetNameModal(){ document.getElementById("setNameOverlay").classList.remove("show"); }
+  document.getElementById("closeSetName").onclick  = closeSetNameModal;
+  document.getElementById("cancelSetName").onclick = closeSetNameModal;
+  document.getElementById("setNameInput").addEventListener("keydown", function(e){ if(e.key==="Enter") document.getElementById("confirmSetName").click(); });
+  document.getElementById("confirmSetName").onclick = function(){
+    var inp = document.getElementById("setNameInput");
+    var err = document.getElementById("setNameError");
+    var clean = (inp.value||"").trim();
+    if(!clean){
+      err.textContent = "Name cannot be blank.";
+      err.style.display = "block";
+      inp.focus();
+      return;
+    }
+    setStaffName(clean);
+    var btn = document.getElementById("staffNameBtn");
+    if(btn) btn.textContent = "👤 " + clean;
+    hideSaveError("patientSaveError");
+    hideSaveError("progressSaveError");
+    closeSetNameModal();
+  };
+
+  /* Add Ward Modal */
+  function openAddWardModal(){
+    var inp = document.getElementById("addWardInput");
+    var err = document.getElementById("addWardError");
+    if(inp){ inp.value = "Ward " + String.fromCharCode(65 + state.wardOrder.length); inp.select(); }
+    if(err){ err.style.display="none"; err.textContent=""; }
+    document.getElementById("addWardOverlay").classList.add("show");
+    setTimeout(function(){ if(inp) inp.focus(); inp && inp.select(); }, 120);
+  }
+  function closeAddWardModal(){ document.getElementById("addWardOverlay").classList.remove("show"); }
+  document.getElementById("closeAddWard").onclick  = closeAddWardModal;
+  document.getElementById("cancelAddWard").onclick = closeAddWardModal;
+  document.getElementById("addWardInput").addEventListener("keydown", function(e){ if(e.key==="Enter") document.getElementById("confirmAddWard").click(); });
+  document.getElementById("confirmAddWard").onclick = function(){
+    var inp = document.getElementById("addWardInput");
+    var err = document.getElementById("addWardError");
+    var name = (inp.value||"").trim();
+    if(!name){ err.textContent="Ward name cannot be blank."; err.style.display="block"; return; }
+    var id = uid();
+    state.wards[id] = { name: name, rooms: {}, roomConfig: {} };
+    state.wardOrder.push(id);
+    activeWardId = id;
+    saveState(); render();
+    closeAddWardModal();
+  };
+
   var staffBtn = document.getElementById("staffNameBtn");
   if(staffBtn){
-    staffBtn.onclick = function(){
-      var current = getStaffName();
-      var name = prompt("Your name / initials (shown on all updates):", current);
-      if(name === null) return; // user pressed Cancel — keep existing
-      var clean = name.trim();
-      if(!clean){
-        alert("Name cannot be blank. Please enter your name or initials.");
-        return;
-      }
-      setStaffName(clean);
-      // clear any lingering save errors now that name is set
-      hideSaveError("patientSaveError");
-      hideSaveError("progressSaveError");
-    };
+    staffBtn.onclick = openSetNameModal;
   }
 
   var titleEl = document.getElementById("appTitle");
@@ -1406,22 +1678,9 @@
   /* Overdue: returns true if nextReview time has passed */
   function isOverdue(patient){
     if(!patient || !patient.nextReview) return false;
-    var nr = patient.nextReview.trim();
-    if(!nr) return false;
-    // Try to parse a time like "14:30", "2:30 PM", "Tomorrow AM" etc.
-    var now = new Date();
-    // If it contains a colon, treat as today's HH:MM
-    var colonMatch = nr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
-    if(colonMatch){
-      var h = parseInt(colonMatch[1],10);
-      var m = parseInt(colonMatch[2],10);
-      var ap = colonMatch[3] ? colonMatch[3].toUpperCase() : null;
-      if(ap === "PM" && h < 12) h += 12;
-      if(ap === "AM" && h === 12) h = 0;
-      var rev = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0);
-      return now > rev;
-    }
-    return false;
+    var d = new Date(patient.nextReview);
+    if(isNaN(d.getTime())) return false;
+    return new Date() > d;
   }
 
   /* Track urgent patients to fire push notifications */
@@ -1455,15 +1714,7 @@
     var addTab = document.createElement("div");
     addTab.className = "ward-tab add-ward";
     addTab.textContent = "+ Add ward";
-    addTab.onclick = function(){
-      var name = prompt("Name for new ward:", "Ward " + String.fromCharCode(65 + state.wardOrder.length));
-      if(!name) return;
-      var id = uid();
-      state.wards[id] = { name: name.trim(), rooms: {}, roomConfig: {} };
-      state.wardOrder.push(id);
-      activeWardId = id;
-      saveState(); render();
-    };
+    addTab.onclick = function(){ openAddWardModal(); };
     wardTabsEl.appendChild(addTab);
   }
 
@@ -1598,10 +1849,17 @@
           removeBBtn.textContent = "Remove Bed B";
           removeBBtn.onclick = (function(rNum){
             return function(){
-              if(w.rooms[rNum+"B"] && !confirm("Bed B is occupied. Remove it anyway?")) return;
-              delete w.rooms[rNum+"B"];
-              w.roomConfig[rNum] = { hasB: false };
-              saveState(); render();
+              if(w.rooms[rNum+"B"]){
+                showConfirm("Remove Bed B", "Bed "+rNum+"B is occupied. Removing it will discharge this patient from the board. Are you sure?", "Remove anyway", "btn-danger-outline", function(){
+                  delete w.rooms[rNum+"B"];
+                  w.roomConfig[rNum] = { hasB: false };
+                  saveState(); render();
+                });
+              } else {
+                delete w.rooms[rNum+"B"];
+                w.roomConfig[rNum] = { hasB: false };
+                saveState(); render();
+              }
             };
           })(room);
           headerRow.appendChild(removeBBtn);
@@ -1690,7 +1948,7 @@
           (entry.situation?'<div class="h-row"><span class="h-label">Situation:</span> '+escapeHtml(entry.situation)+'</div>':'')+
           (entry.plan?'<div class="h-row"><span class="h-label">Plan:</span> '+escapeHtml(entry.plan)+'</div>':'');
         he.querySelector(".del").onclick = function(){
-          if(confirm("Delete history entry?")){ patient.history.splice(realIdx,1); saveState(); render(); }
+          showConfirm("Delete entry", "Delete this history entry? This cannot be undone.", "Delete", "btn-danger-outline", function(){ patient.history.splice(realIdx,1); saveState(); render(); });
         };
         histList.appendChild(he);
       });
@@ -1720,8 +1978,14 @@
       openDischargeSummary(room, bed);
     };
 
+    var transferBtn = document.createElement("button");
+    transferBtn.className = "btn-outline";
+    transferBtn.textContent = "🔀 Transfer";
+    transferBtn.onclick = function(){ openTransferModal(room, bed); };
+
     actions.appendChild(updateBtn);
     actions.appendChild(editBtn);
+    actions.appendChild(transferBtn);
     actions.appendChild(dischargeBtn);
     card.appendChild(actions);
 
@@ -1774,7 +2038,13 @@
     setVal("f_diagnosis", patient ? patient.diagnosis : "");
     setVal("f_situation", patient ? patient.situation : "");
     setVal("f_plan", patient ? patient.plan : "");
-    setVal("f_nextReview", patient ? patient.nextReview : "");
+    // Load nextReview into time picker
+    var rv = parseReviewISO(patient ? patient.nextReview : "");
+    var fNR = document.getElementById("f_nextReview");
+    var fNRD = document.getElementById("f_nextReviewDay");
+    if(fNR) fNR.value = rv.time;
+    if(fNRD) fNRD.value = rv.day;
+    updateReviewPreview("f_nextReview","f_nextReviewDay","f_reviewPreview");
     setVal("f_gestation", patient ? patient.gestation : "");
     setVal("f_indication", patient ? patient.indication : "");
     setVal("f_fetal", patient ? patient.fetal : "");
@@ -1831,7 +2101,7 @@
         diagnosis: getVal("f_diagnosis"),
         situation: getVal("f_situation"),
         plan: getVal("f_plan"),
-        nextReview: getVal("f_nextReview"),
+        nextReview: buildReviewISO(getVal("f_nextReview"), document.getElementById("f_nextReviewDay").value),
         gestation: getVal("f_gestation"),
         indication: getVal("f_indication"),
         fetal: getVal("f_fetal"),
@@ -1888,7 +2158,13 @@
     var pn = document.getElementById("p_nextReview");
     if(ps) ps.value = lastEntry ? lastEntry.situation : patient.situation || "";
     if(pp) pp.value = lastEntry ? lastEntry.plan : patient.plan || "";
-    if(pn) pn.value = (lastEntry && lastEntry.nextReview!==undefined) ? lastEntry.nextReview : patient.nextReview || "";
+    // Load nextReview into time picker
+    var prv = parseReviewISO((lastEntry && lastEntry.nextReview) ? lastEntry.nextReview : patient.nextReview || "");
+    var pNR = document.getElementById("p_nextReview");
+    var pNRD = document.getElementById("p_nextReviewDay");
+    if(pNR) pNR.value = prv.time;
+    if(pNRD) pNRD.value = prv.day;
+    updateReviewPreview("p_nextReview","p_nextReviewDay","p_reviewPreview");
 
     if(progressOverlay) progressOverlay.classList.add("show");
   }
@@ -1924,7 +2200,7 @@
         acuity: progressAcuity,
         situation: ps ? ps.value.trim() : "",
         plan: pp ? pp.value.trim() : "",
-        nextReview: pn ? pn.value.trim() : "",
+        nextReview: buildReviewISO((document.getElementById("p_nextReview")||{}).value||"", (document.getElementById("p_nextReviewDay")||{}).value||"today"),
         updatedBy: staffName
       };
       patient.acuity = progressAcuity;
@@ -2134,6 +2410,152 @@
       saveState();
     }
   };
+
+  /* ============================================================
+     NEXT REVIEW — time picker helpers
+  ============================================================ */
+  /* Build a full ISO datetime string from time (HH:MM) + day (today/tomorrow) */
+  function buildReviewISO(timeVal, dayVal){
+    if(!timeVal) return "";
+    var parts = timeVal.split(":");
+    if(parts.length < 2) return "";
+    var h = parseInt(parts[0],10), m = parseInt(parts[1],10);
+    var d = new Date();
+    if(dayVal === "tomorrow") d.setDate(d.getDate()+1);
+    d.setHours(h, m, 0, 0);
+    return d.toISOString();
+  }
+
+  /* Parse a stored ISO or legacy free-text value back into {time, day} for the picker */
+  function parseReviewISO(stored){
+    if(!stored) return {time:"", day:"today"};
+    var d = new Date(stored);
+    if(!isNaN(d.getTime())){
+      var now = new Date();
+      var hh = String(d.getHours()).padStart(2,"0");
+      var mm = String(d.getMinutes()).padStart(2,"0");
+      var day = d.toDateString() === now.toDateString() ? "today" : "tomorrow";
+      return {time: hh+":"+mm, day: day};
+    }
+    // Legacy free-text — just show it as a note
+    return {time:"", day:"today", legacy: stored};
+  }
+
+  function updateReviewPreview(timeId, dayId, previewId){
+    var t = (document.getElementById(timeId)||{}).value || "";
+    var d = (document.getElementById(dayId)||{}).value || "today";
+    var p = document.getElementById(previewId);
+    if(!p) return;
+    if(!t){ p.textContent=""; return; }
+    var iso = buildReviewISO(t, d);
+    if(!iso){ p.textContent=""; return; }
+    var dt = new Date(iso);
+    p.textContent = "⏰ Reviewing " + dt.toLocaleDateString([],{weekday:"short"}) + " at " + dt.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
+  }
+
+  ["f_nextReview","f_nextReviewDay"].forEach(function(id){
+    var el = document.getElementById(id);
+    if(el) el.addEventListener("change", function(){ updateReviewPreview("f_nextReview","f_nextReviewDay","f_reviewPreview"); });
+  });
+  ["p_nextReview","p_nextReviewDay"].forEach(function(id){
+    var el = document.getElementById(id);
+    if(el) el.addEventListener("change", function(){ updateReviewPreview("p_nextReview","p_nextReviewDay","p_reviewPreview"); });
+  });
+  document.getElementById("f_clearReview").onclick = function(){ document.getElementById("f_nextReview").value=""; document.getElementById("f_nextReviewDay").value="today"; updateReviewPreview("f_nextReview","f_nextReviewDay","f_reviewPreview"); };
+  document.getElementById("p_clearReview").onclick = function(){ document.getElementById("p_nextReview").value=""; document.getElementById("p_nextReviewDay").value="today"; updateReviewPreview("p_nextReview","p_nextReviewDay","p_reviewPreview"); };
+
+
+  /* ============================================================
+     FEATURE: PATIENT TRANSFER
+  ============================================================ */
+  var _pendingTransfer = null;
+
+  function openTransferModal(room, bed){
+    var w = currentWard();
+    var patient = w.rooms[bedKey(room,bed)];
+    if(!patient) return;
+    _pendingTransfer = { fromWardId: activeWardId, room: room, bed: bed };
+
+    var label = document.getElementById("transferPatientLabel");
+    if(label) label.textContent = (patient.name||"Patient") + " — currently in " + w.name + ", Bed " + room + bed;
+
+    // Populate ward select (exclude current ward)
+    var wardSel = document.getElementById("transferWardSelect");
+    wardSel.innerHTML = "";
+    state.wardOrder.forEach(function(id){
+      if(id === activeWardId) return;
+      var opt = document.createElement("option");
+      opt.value = id;
+      opt.textContent = state.wards[id].name;
+      wardSel.appendChild(opt);
+    });
+    if(!wardSel.options.length){
+      document.getElementById("transferError").textContent = "No other wards available. Add another ward first.";
+      document.getElementById("transferError").style.display = "block";
+      document.getElementById("confirmTransfer").disabled = true;
+    } else {
+      document.getElementById("transferError").style.display = "none";
+      document.getElementById("confirmTransfer").disabled = false;
+      populateTransferBeds(wardSel.value);
+    }
+    document.getElementById("transferOverlay").classList.add("show");
+  }
+
+  function populateTransferBeds(wardId){
+    var bedSel = document.getElementById("transferBedSelect");
+    bedSel.innerHTML = "";
+    var w = state.wards[wardId]; if(!w) return;
+    for(var r=1; r<=ROOMS_PER_WARD; r++){
+      ["A","B"].forEach(function(b){
+        var key = r+b;
+        if(b==="B" && !(w.roomConfig&&w.roomConfig[r]&&w.roomConfig[r].hasB) && !w.rooms[key]) return;
+        if(!w.rooms[key]){
+          var opt = document.createElement("option");
+          opt.value = key;
+          opt.textContent = "Bed " + key + " (empty)";
+          bedSel.appendChild(opt);
+        }
+      });
+    }
+    if(!bedSel.options.length){
+      var opt = document.createElement("option"); opt.value=""; opt.textContent="No empty beds"; bedSel.appendChild(opt);
+      document.getElementById("confirmTransfer").disabled = true;
+    } else {
+      document.getElementById("confirmTransfer").disabled = false;
+    }
+  }
+
+  document.getElementById("transferWardSelect").addEventListener("change", function(){ populateTransferBeds(this.value); });
+  document.getElementById("closeTransfer").onclick  = function(){ document.getElementById("transferOverlay").classList.remove("show"); _pendingTransfer=null; };
+  document.getElementById("cancelTransfer").onclick = function(){ document.getElementById("transferOverlay").classList.remove("show"); _pendingTransfer=null; };
+
+  document.getElementById("confirmTransfer").onclick = function(){
+    if(!_pendingTransfer) return;
+    var toWardId = document.getElementById("transferWardSelect").value;
+    var toBed    = document.getElementById("transferBedSelect").value;
+    if(!toWardId || !toBed){ document.getElementById("transferError").textContent="Please select a destination bed."; document.getElementById("transferError").style.display="block"; return; }
+    var fromW = state.wards[_pendingTransfer.fromWardId];
+    var toW   = state.wards[toWardId];
+    var key   = bedKey(_pendingTransfer.room, _pendingTransfer.bed);
+    var patient = fromW.rooms[key];
+    if(!patient) return;
+
+    // Log the transfer
+    hodLog("transfer", "Transferred: "+(patient.name||key)+" from "+fromW.name+" "+_pendingTransfer.room+_pendingTransfer.bed+" → "+toW.name+" "+toBed, fromW.name);
+
+    // Move patient
+    toW.rooms[toBed] = Object.assign({}, patient, {
+      transferredFrom: fromW.name + " " + _pendingTransfer.room + _pendingTransfer.bed,
+      transferredAt:   nowISO(),
+      transferredBy:   getStaffName()||"Staff"
+    });
+    delete fromW.rooms[key];
+    saveState();
+    document.getElementById("transferOverlay").classList.remove("show");
+    _pendingTransfer = null;
+    render();
+  };
+
 
   /* ============================================================
      FEATURE: DISCHARGE SUMMARY
@@ -2352,7 +2774,7 @@
     if(!("Notification" in window)) return;
     if(Notification.permission === "granted"){ if(callback) callback("granted"); return; }
     if(Notification.permission === "denied"){
-      alert("Notifications are blocked.\n\nTo enable:\n• iPhone: Settings → Safari → [this site] → Notifications → Allow\n• Android: Browser settings → Notifications → Allow\n• Desktop: Click the lock icon in the address bar");
+      showNotifInfo("🔔 Notifications blocked", "Notifications are blocked on this device.\n\nTo enable:\n• iPhone: Settings → Safari → [this site] → Notifications → Allow\n• Android: Browser menu → Settings → Notifications → Allow\n• Desktop: Click the 🔒 lock icon in the address bar");
       return;
     }
     Notification.requestPermission().then(function(perm){
@@ -2369,12 +2791,11 @@
   if(notifHeaderBtn){
     notifHeaderBtn.onclick = function(){
       if(!("Notification" in window)){
-        alert("Push notifications are not supported on this browser.\n\nFor best results, use Chrome on Android or Safari on iPhone with the app added to your Home Screen.");
+        showNotifInfo("🔔 Not supported", "Push notifications are not supported on this browser.\n\nFor best results:\n• iPhone — add to Home Screen from Safari, then enable\n• Android — use Chrome browser");
         return;
       }
       if(Notification.permission === "granted"){
-        // Already on — show status
-        alert("✓ Urgent patient alerts are active on this device.\n\nYou will receive a notification whenever a patient is marked Urgent.\n\nTo disable, go to your device/browser notification settings.");
+        showNotifInfo("🔔 Alerts active", "✓ Urgent patient alerts are active on this device.\n\nYou will be notified whenever a patient is marked Urgent.\n\nTo disable, go to your device or browser notification settings.");
         return;
       }
       requestNotifPermission(null);
