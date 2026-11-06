@@ -690,7 +690,7 @@
     .ds-label{font-size:8pt;}
   }
 
-  /* HOD Panel */
+  /* Lead Panel */
   .btn-hod{color:#e8c84a !important; border-color:rgba(232,200,74,0.35) !important;}
   .btn-hod:hover{background:rgba(232,200,74,0.12) !important;}
   .hod-section{margin-bottom:22px; padding-bottom:18px; border-bottom:1px solid var(--line-soft);}
@@ -727,7 +727,7 @@
     <button class="btn-ghost btn-small" id="staffNameBtn">👤 Set name</button>
     <button class="btn-ghost btn-small btn-notif" id="notifHeaderBtn" title="Enable urgent alerts on this device" aria-label="Enable notifications">🔔</button>
     <button class="btn-ghost btn-small" id="darkModeBtn" title="Toggle dark mode" aria-label="Toggle dark mode">🌙</button>
-    <button class="btn-ghost btn-small btn-hod" id="hodBtn">🔑 HOD</button>
+    <button class="btn-ghost btn-small btn-hod" id="hodBtn">🔑 Lead</button>
     <button class="btn-ghost btn-small" id="exportSummaryBtn">📋 Handover</button>
     <button class="btn-ghost btn-small" id="printBtn">🖨️ Print</button>
   </div>
@@ -788,7 +788,7 @@
 <div id="grid"></div>
 
 <footer>
-  <div style="margin-bottom:4px;">🩺 Ward Board &nbsp;·&nbsp; <span id="appVersion">v0.7 · test build</span></div>
+  <div style="margin-bottom:4px;">🩺 Ward Board &nbsp;·&nbsp; <span id="appVersion">v0.8 · test build</span> &nbsp;·&nbsp; <button onclick="document.getElementById('shortcutsOverlay').classList.add('show')" style="background:none;border:none;color:var(--ink-mute);font-size:0.72rem;cursor:pointer;padding:0;font-family:inherit;">⌨️ Keyboard shortcuts</button></div>
   <div>For clinical workflow support during duty — not a substitute for the EHR</div>
 </footer>
 
@@ -856,6 +856,9 @@
         <div class="section-divider">Antenatal details</div>
         <div class="form-row" style="margin-top:10px;">
           <div class="form-field"><label>Gestation</label><input type="text" id="f_gestation" placeholder="e.g. 34+2 weeks"></div>
+          <div class="form-field"><label>EDD (Expected Delivery Date)</label><input type="date" id="f_edd"></div>
+        </div>
+        <div class="form-row">
           <div class="form-field"><label>Indication</label><input type="text" id="f_indication" placeholder="e.g. reduced movements"></div>
         </div>
         <div class="form-field"><label>Fetal monitoring</label><textarea id="f_fetal" placeholder="e.g. CTG reactive"></textarea></div>
@@ -1064,7 +1067,7 @@
   </div>
 </div>
 
-<!-- HOD Stats Modal -->
+<!-- Lead Stats Modal -->
 <div class="overlay" id="hodStatsOverlay">
   <div class="modal" style="max-width:600px;">
     <div class="modal-head">
@@ -1088,15 +1091,76 @@
   </div>
 </div>
 
-<!-- HOD PIN Modal -->
+<!-- Data Backup Modal -->
+<div class="overlay" id="backupOverlay">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-head">
+      <h2>💾 Data Backup</h2>
+      <button class="modal-close" id="closeBackup">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="margin:0 0 12px;font-size:0.88rem;color:var(--ink-soft);">Download a full backup of all ward data as a JSON file. Store it somewhere safe — Google Drive, email to yourself, or a USB drive.</p>
+      <div id="backupInfo" style="background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:12px;font-size:0.82rem;color:var(--ink-soft);"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-outline" id="cancelBackup">Close</button>
+      <button class="btn-primary" id="downloadBackup">⬇️ Download backup</button>
+    </div>
+  </div>
+</div>
+
+<!-- Census PDF Modal -->
+<div class="overlay" id="censusOverlay">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-head">
+      <h2>📊 Census Report</h2>
+      <button class="modal-close" id="closeCensus">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="margin:0 0 12px;font-size:0.88rem;color:var(--ink-soft);">Generate a daily patient census for the morning meeting.</p>
+      <div class="form-field">
+        <label>Include wards</label>
+        <select id="censusWardSel">
+          <option value="">All wards</option>
+        </select>
+      </div>
+      <div class="form-field">
+        <label>Report date</label>
+        <input type="date" id="censusDate">
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-outline" id="cancelCensus">Cancel</button>
+      <button class="btn-primary" id="printCensus">🖨️ Print / Save PDF</button>
+    </div>
+  </div>
+</div>
+
+<!-- Keyboard Shortcuts Modal -->
+<div class="overlay" id="shortcutsOverlay">
+  <div class="modal" style="max-width:400px;">
+    <div class="modal-head">
+      <h2>⌨️ Keyboard shortcuts</h2>
+      <button class="modal-close" id="closeShortcuts">✕</button>
+    </div>
+    <div class="modal-body" style="gap:6px;">
+      <div id="shortcutsList"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-primary" id="okShortcuts">Got it</button>
+    </div>
+  </div>
+</div>
+
+<!-- Lead PIN Modal -->
 <div class="overlay" id="hodPinOverlay">
   <div class="modal" style="max-width:340px;">
     <div class="modal-head">
-      <h2>🔑 HOD Access</h2>
+      <h2>🔑 Lead Access</h2>
       <button class="modal-close" id="closeHodPinModal">✕</button>
     </div>
     <div class="modal-body" style="padding:20px 24px 8px;">
-      <p style="margin:0 0 14px;font-size:0.9rem;color:var(--ink-soft);">Enter the HOD PIN to unlock admin controls.</p>
+      <p style="margin:0 0 14px;font-size:0.9rem;color:var(--ink-soft);">Enter the Lead PIN to unlock admin controls.</p>
       <div class="form-field">
         <label>PIN</label>
         <input type="password" id="hodPinInput" placeholder="••••" maxlength="8" autocomplete="off"
@@ -1111,11 +1175,11 @@
   </div>
 </div>
 
-<!-- HOD Panel Modal -->
+<!-- Lead Panel Modal -->
 <div class="overlay" id="hodPanelOverlay">
   <div class="modal" style="max-width:520px;">
     <div class="modal-head">
-      <h2>🔑 HOD Panel</h2>
+      <h2>🔑 Lead Panel</h2>
       <button class="modal-close" id="closeHodPanel">✕</button>
     </div>
     <div class="modal-body" style="padding:20px 24px;">
@@ -1172,6 +1236,26 @@
         </div>
       </div>
 
+      <!-- Section: Ward management -->
+      <div class="hod-section">
+        <div class="hod-section-title">🏥 Ward management</div>
+        <div id="hod_wardDeleteList" style="display:flex;flex-direction:column;gap:6px;"></div>
+      </div>
+
+      <!-- Section: Data backup -->
+      <div class="hod-section">
+        <div class="hod-section-title">💾 Data backup</div>
+        <p style="font-size:0.82rem;color:var(--ink-soft);margin:0 0 10px;">Download all ward data as a JSON backup file.</p>
+        <button class="btn-outline" id="hod_backupBtn" style="width:100%;">💾 Download backup now</button>
+      </div>
+
+      <!-- Section: Census report -->
+      <div class="hod-section">
+        <div class="hod-section-title">📋 Census report</div>
+        <p style="font-size:0.82rem;color:var(--ink-soft);margin:0 0 10px;">Generate a daily patient census for the morning meeting.</p>
+        <button class="btn-outline" id="hod_censusBtn" style="width:100%;">📋 Generate census report</button>
+      </div>
+
       <!-- Section: Stats -->
       <div class="hod-section">
         <div class="hod-section-title">📊 Statistics</div>
@@ -1188,9 +1272,9 @@
         </div>
       </div>
 
-      <!-- Section: Change HOD PIN -->
+      <!-- Section: Change Lead PIN -->
       <div class="hod-section">
-        <div class="hod-section-title">🔒 Change HOD PIN</div>
+        <div class="hod-section-title">🔒 Change Lead PIN</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;">
           <div class="form-field" style="flex:1;min-width:110px;">
             <label>New PIN</label>
@@ -1206,7 +1290,7 @@
       </div>
 
       <div style="text-align:right;margin-top:4px;">
-        <button class="btn-danger-outline" id="hod_lockBtn" style="font-size:0.8rem;">🔒 Lock HOD session</button>
+        <button class="btn-danger-outline" id="hod_lockBtn" style="font-size:0.8rem;">🔒 Lock Lead session</button>
       </div>
     </div>
   </div>
@@ -1345,13 +1429,13 @@
   }
 
   /* ============================================================
-     HOD ACCESS CONTROL
-     Default PIN: 1234  (HOD should change it on first use)
+     LEAD ACCESS CONTROL
+     Default PIN: 1234  (Lead should change it on first use)
      PIN is stored hashed (simple FNV-32) in localStorage.
      Session unlocked flag lives only in memory — resets on reload.
   ============================================================ */
-  var HOD_PIN_KEY  = "ward_board_hod_pin";
-  var HOD_DEFAULT  = "1234";
+  var LEAD_PIN_KEY  = "ward_board_lead_pin";
+  var LEAD_DEFAULT  = "1234";
   var hodUnlocked  = false;
 
   function fnv32(str){
@@ -1360,13 +1444,13 @@
     return h.toString(16);
   }
   function getStoredPinHash(){
-    return localStorage.getItem(HOD_PIN_KEY) || fnv32(HOD_DEFAULT);
+    return localStorage.getItem(LEAD_PIN_KEY) || fnv32(LEAD_DEFAULT);
   }
   function checkPin(pin){
     return fnv32(pin) === getStoredPinHash();
   }
   function savePin(pin){
-    localStorage.setItem(HOD_PIN_KEY, fnv32(pin));
+    localStorage.setItem(LEAD_PIN_KEY, fnv32(pin));
   }
 
   /* Log an event to state.hodLog (last 30 days rolling) */
@@ -1388,17 +1472,17 @@
   function unlockHod(){
     hodUnlocked = true;
     var btn = document.getElementById("hodBtn");
-    if(btn){ btn.style.display = ""; btn.textContent = "🔑 HOD ✓"; }
+    if(btn){ btn.style.display = ""; btn.textContent = "🔑 Lead ✓"; }
   }
   function lockHod(){
     hodUnlocked = false;
     var btn = document.getElementById("hodBtn");
-    if(btn){ btn.style.display = ""; btn.textContent = "🔑 HOD"; }
+    if(btn){ btn.style.display = ""; btn.textContent = "🔑 Lead"; }
     var panel = document.getElementById("hodPanelOverlay");
     if(panel) panel.classList.remove("show");
   }
 
-  /* Always show HOD button — clicking opens PIN if locked, panel if unlocked */
+  /* Always show Lead button — clicking opens PIN if locked, panel if unlocked */
   (function(){
     var btn = document.getElementById("hodBtn");
     if(btn){
@@ -1445,7 +1529,7 @@
     }
   };
 
-  /* HOD Panel */
+  /* Lead Panel */
   function openHodPanel(){
     var ov = document.getElementById("hodPanelOverlay");
     if(!ov) return;
@@ -1454,6 +1538,7 @@
     renderHodWardList();
     renderHodBedCounts();
     renderHodConsultantList();
+    renderLeadWardDeleteList();
     renderHodHistWardFilter();
     renderHodHistory();
     ov.classList.add("show");
@@ -2120,6 +2205,23 @@
     }
     html += '<div class="patient-name-row"><span class="pname">'+escapeHtml(patient.name || "Unnamed")+'</span>'+(patient.age?'<span class="meta">'+escapeHtml(patient.age)+'</span>':'')+'</div>';
     html += '<div class="field"><label>Diagnosis</label><div class="value">'+(patient.diagnosis?escapeHtml(patient.diagnosis):'<span class="empty-val">Not recorded</span>')+'</div></div>';
+
+    // EDD + Gestation for antenatal patients
+    if(patient.type === "antenatal" && (patient.gestation || patient.edd)){
+      var gestParts = [];
+      if(patient.gestation) gestParts.push(escapeHtml(patient.gestation));
+      if(patient.edd){
+        var eddD = new Date(patient.edd);
+        if(!isNaN(eddD.getTime())){
+          var eddStr = eddD.toLocaleDateString([],{day:'2-digit',month:'short',year:'numeric'});
+          var daysToEdd = Math.ceil((eddD.setHours(0,0,0,0) - new Date().setHours(0,0,0,0)) / 86400000);
+          var daysLabel = daysToEdd === 0 ? ' 🔴 today' : daysToEdd > 0 ? ' ('+daysToEdd+'d)' : ' <span style="color:var(--red);">('+Math.abs(daysToEdd)+'d overdue)</span>';
+          gestParts.push('EDD: <strong>'+eddStr+'</strong>'+daysLabel);
+        }
+      }
+      html += '<div class="field"><label>Gestation / EDD</label><div class="value" style="font-size:0.82rem;">'+gestParts.join(' &nbsp;·&nbsp; ')+'</div></div>';
+    }
+
     html += '<div class="field"><label>Current situation</label><div class="value">'+(displaySituation?escapeHtml(displaySituation):'<span class="empty-val">Not recorded</span>')+'</div></div>';
     html += '<div class="field"><label>Plan</label><div class="value">'+(displayPlan?escapeHtml(displayPlan):'<span class="empty-val">Not recorded</span>')+'</div></div>';
     
@@ -2262,6 +2364,9 @@
     updateReviewPreview("f_nextReview","f_nextReviewDay","f_reviewPreview");
     setVal("f_gestation", patient ? patient.gestation : "");
     setVal("f_indication", patient ? patient.indication : "");
+    // EDD — stored as YYYY-MM-DD
+    var eddEl = document.getElementById("f_edd");
+    if(eddEl) eddEl.value = patient && patient.edd ? patient.edd : "";
     setVal("f_fetal", patient ? patient.fetal : "");
     setVal("f_modeDelivery", patient ? patient.modeDelivery : "");
     setVal("f_dayPostDelivery", patient ? patient.dayPostDelivery : "");
@@ -2318,6 +2423,7 @@
         plan: getVal("f_plan"),
         nextReview: buildReviewISO(getVal("f_nextReview"), document.getElementById("f_nextReviewDay").value),
         gestation: getVal("f_gestation"),
+        edd: (document.getElementById("f_edd")||{}).value || "",
         indication: getVal("f_indication"),
         fetal: getVal("f_fetal"),
         modeDelivery: getVal("f_modeDelivery"),
@@ -2602,7 +2708,14 @@
   var searchBox = document.getElementById("searchBox");
   var unitFilter = document.getElementById("unitFilter");
   var typeFilter = document.getElementById("typeFilter");
-  if(searchBox) searchBox.addEventListener("input", render);
+  if(searchBox) searchBox.addEventListener("input", function(){
+    render();
+    renderCrossWardSearch(searchBox.value.trim());
+    if(!searchBox.value.trim()){
+      var hint = document.getElementById("crossWardHint");
+      if(hint) hint.style.display = "none";
+    }
+  });
   if(unitFilter) unitFilter.addEventListener("change", render);
   if(typeFilter) typeFilter.addEventListener("change", render);
 
@@ -2866,7 +2979,7 @@
 
 
   /* ============================================================
-     FEATURE: HOD STATISTICS DASHBOARD
+     FEATURE: LEAD STATISTICS DASHBOARD
   ============================================================ */
   function openHodStats(){
     var sel = document.getElementById("statsWard");
@@ -2949,12 +3062,314 @@
     document.getElementById("statsContent").innerHTML = html;
   }
 
-  // Wire HOD panel → stats button
+  // Wire Lead panel → stats button
   document.getElementById("hod_statsBtn").onclick = function(){
     document.getElementById("hodPanelOverlay").classList.remove("show");
     openHodStats();
   };
 
+
+  /* ============================================================
+     FEATURE: WARD DELETE (Lead panel)
+  ============================================================ */
+  function renderLeadWardDeleteList(){
+    var container = document.getElementById("hod_wardDeleteList");
+    if(!container) return;
+    container.innerHTML = "";
+    state.wardOrder.forEach(function(id){
+      var w = state.wards[id]; if(!w) return;
+      var occupied = Object.keys(w.rooms||{}).filter(function(k){ return !!w.rooms[k]; }).length;
+      var row = document.createElement("div");
+      row.style.cssText = "display:flex;gap:8px;align-items:center;";
+      var lbl = document.createElement("span");
+      lbl.style.cssText = "flex:1;font-size:0.84rem;font-weight:600;";
+      lbl.textContent = w.name + (occupied ? " ("+occupied+" patient"+(occupied>1?"s":"")+")":"  — empty");
+      var del = document.createElement("button");
+      del.className = "btn-danger-outline btn-small";
+      del.textContent = "Delete";
+      del.disabled = occupied > 0;
+      del.title = occupied > 0 ? "Discharge all patients before deleting" : "Delete this ward";
+      del.onclick = (function(wid, wname){
+        return function(){
+          showConfirm("Delete ward", "Permanently delete \""+wname+"\"? This cannot be undone.", "Delete ward", "btn-danger-outline", function(){
+            var idx = state.wardOrder.indexOf(wid);
+            if(idx > -1) state.wardOrder.splice(idx,1);
+            delete state.wards[wid];
+            if(activeWardId === wid) activeWardId = state.wardOrder[0];
+            saveState(); render();
+            renderLeadWardDeleteList();
+          });
+        };
+      })(id, w.name);
+      row.appendChild(lbl); row.appendChild(del);
+      container.appendChild(row);
+    });
+  }
+
+  /* ============================================================
+     FEATURE: CROSS-WARD PATIENT SEARCH
+  ============================================================ */
+  function renderCrossWardSearch(query){
+    if(!query || query.length < 2) return; // only kick in with 2+ chars
+    var q = query.toLowerCase();
+    var results = [];
+    state.wardOrder.forEach(function(id){
+      var w = state.wards[id]; if(!w||!w.rooms) return;
+      Object.keys(w.rooms).forEach(function(bKey){
+        var p = w.rooms[bKey]; if(!p) return;
+        var searchable = [p.name,p.diagnosis,p.unit,p.gestation,p.indication,p.procedure].filter(Boolean).join(" ").toLowerCase();
+        if(searchable.includes(q)){
+          results.push({wardId:id, wardName:w.name, bedKey:bKey, patient:p});
+        }
+      });
+    });
+    // If results are from other wards, show a cross-ward hint
+    var otherWard = results.filter(function(r){ return r.wardId !== activeWardId; });
+    var hint = document.getElementById("crossWardHint");
+    if(!hint){
+      hint = document.createElement("div");
+      hint.id = "crossWardHint";
+      hint.style.cssText = "font-size:0.78rem;padding:6px 16px 2px;color:var(--accent);font-weight:600;background:var(--accent-soft);";
+      var toolbar = document.querySelector(".toolbar");
+      if(toolbar) toolbar.parentNode.insertBefore(hint, toolbar.nextSibling);
+    }
+    if(otherWard.length){
+      hint.style.display = "block";
+      hint.innerHTML = "🔍 Also found in other wards: " + otherWard.map(function(r){
+        return '<a href="#" style="color:var(--accent);font-weight:700;text-decoration:underline;" onclick="activeWardId=\''+r.wardId+'\';render();document.getElementById(\'searchBox\').value=\''+escapeHtml(query)+'\';render();event.preventDefault();">'+escapeHtml(r.wardName)+'</a>';
+      }).join(", ");
+    } else {
+      hint.style.display = "none";
+    }
+  }
+
+  /* ============================================================
+     FEATURE: DATA BACKUP
+  ============================================================ */
+  document.getElementById("hod_backupBtn").onclick = function(){
+    document.getElementById("hodPanelOverlay").classList.remove("show");
+    openBackupModal();
+  };
+
+  function openBackupModal(){
+    var info = document.getElementById("backupInfo");
+    if(info){
+      var totalPatients = 0;
+      state.wardOrder.forEach(function(id){
+        var w = state.wards[id]; if(!w||!w.rooms) return;
+        totalPatients += Object.values(w.rooms).filter(Boolean).length;
+      });
+      info.innerHTML =
+        "<strong>Wards:</strong> "+state.wardOrder.length+"<br>"+
+        "<strong>Current patients:</strong> "+totalPatients+"<br>"+
+        "<strong>History entries:</strong> "+((state.hodLog||[]).length)+"<br>"+
+        "<strong>Backup time:</strong> "+new Date().toLocaleString();
+    }
+    document.getElementById("backupOverlay").classList.add("show");
+  }
+
+  document.getElementById("closeBackup").onclick   = function(){ document.getElementById("backupOverlay").classList.remove("show"); };
+  document.getElementById("cancelBackup").onclick  = function(){ document.getElementById("backupOverlay").classList.remove("show"); };
+  document.getElementById("downloadBackup").onclick = function(){
+    var data = JSON.stringify({
+      exportedAt: nowISO(),
+      exportedBy: getStaffName()||"Lead",
+      appVersion: "v0.8",
+      state: state
+    }, null, 2);
+    var blob = new Blob([data], {type:"application/json"});
+    var url  = URL.createObjectURL(blob);
+    var a    = document.createElement("a");
+    a.href   = url;
+    a.download = "ward-board-backup-"+new Date().toISOString().slice(0,10)+".json";
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    document.getElementById("backupOverlay").classList.remove("show");
+  };
+
+  /* ============================================================
+     FEATURE: CENSUS REPORT (printable)
+  ============================================================ */
+  document.getElementById("hod_censusBtn").onclick = function(){
+    document.getElementById("hodPanelOverlay").classList.remove("show");
+    openCensusModal();
+  };
+
+  function openCensusModal(){
+    // Populate ward selector
+    var sel = document.getElementById("censusWardSel");
+    sel.innerHTML = '<option value="">All wards</option>';
+    state.wardOrder.forEach(function(id){
+      var w = state.wards[id]; if(!w) return;
+      var o = document.createElement("option"); o.value=id; o.textContent=w.name;
+      sel.appendChild(o);
+    });
+    // Set today's date
+    var dateEl = document.getElementById("censusDate");
+    if(dateEl) dateEl.value = new Date().toISOString().slice(0,10);
+    document.getElementById("censusOverlay").classList.add("show");
+  }
+
+  document.getElementById("closeCensus").onclick  = function(){ document.getElementById("censusOverlay").classList.remove("show"); };
+  document.getElementById("cancelCensus").onclick = function(){ document.getElementById("censusOverlay").classList.remove("show"); };
+  document.getElementById("printCensus").onclick  = function(){
+    var wardId   = document.getElementById("censusWardSel").value;
+    var dateStr  = document.getElementById("censusDate").value;
+    var dateLabel= dateStr ? new Date(dateStr).toLocaleDateString([],{weekday:"long",day:"2-digit",month:"long",year:"numeric"}) : new Date().toLocaleDateString([],{weekday:"long",day:"2-digit",month:"long",year:"numeric"});
+    var wardIds  = wardId ? [wardId] : state.wardOrder;
+
+    var totalAnte=0, totalPost=0, totalGynae=0, totalUrgent=0, totalReview=0, totalStable=0;
+    var consultantCounts = {};
+    var rows = "";
+
+    wardIds.forEach(function(id){
+      var w = state.wards[id]; if(!w||!w.rooms) return;
+      var wardTotal = 0;
+      var wardHtml = "";
+      var rc = w.roomCount || 24;
+      for(var r=1; r<=rc; r++){
+        ["A","B"].forEach(function(b){
+          var p = w.rooms[r+b]; if(!p) return;
+          wardTotal++;
+          if(p.type==="antenatal") totalAnte++;
+          else if(p.type==="postnatal") totalPost++;
+          else if(p.type==="gynae") totalGynae++;
+          if(p.acuity==="urgent") totalUrgent++;
+          else if(p.acuity==="review") totalReview++;
+          else totalStable++;
+          if(p.unit){ consultantCounts[p.unit] = (consultantCounts[p.unit]||0)+1; }
+
+          var lastE = p.history&&p.history.length ? p.history[p.history.length-1] : null;
+          var sit = lastE ? lastE.situation : p.situation;
+          var nr = lastE ? lastE.nextReview : p.nextReview;
+          var nrFmt = "";
+          if(nr){ var nd=new Date(nr); nrFmt=!isNaN(nd.getTime())?nd.toLocaleString([],{hour:"2-digit",minute:"2-digit",day:"2-digit",month:"short"}):""; }
+
+          wardHtml += '<tr style="border-bottom:1px solid #eee;">' +
+            '<td style="padding:4px 6px;font-weight:700;">'+r+b+'</td>'+
+            '<td style="padding:4px 6px;">'+escapeHtml(p.name||"—")+(p.age?' <span style="color:#888;font-size:9px;">'+escapeHtml(p.age)+'</span>':'')+'</td>'+
+            '<td style="padding:4px 6px;">'+(TYPE_LABEL[p.type]||"—").slice(0,4)+'</td>'+
+            '<td style="padding:4px 6px;">'+escapeHtml(p.diagnosis||"—")+'</td>'+
+            '<td style="padding:4px 6px;">'+escapeHtml(p.unit||"—")+'</td>'+
+            '<td style="padding:4px 6px;color:'+(p.acuity==="urgent"?"#c0291f":p.acuity==="review"?"#9e5f06":"#1a5fa8")+';font-weight:700;">'+(ACUITY_LABEL[p.acuity]||"Stable")+'</td>'+
+            '<td style="padding:4px 6px;font-size:9px;">'+(escapeHtml(sit||"").slice(0,60))+'</td>'+
+            '<td style="padding:4px 6px;font-size:9px;">'+(nrFmt)+'</td>'+
+            '</tr>';
+        });
+      }
+      if(wardTotal > 0){
+        rows += '<tr style="background:#f4f6f8;"><td colspan="8" style="padding:6px 8px;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:0.05em;">'+escapeHtml(w.name)+' — '+wardTotal+' patient'+(wardTotal>1?"s":"")+'</td></tr>';
+        rows += wardHtml;
+      }
+    });
+
+    var grandTotal = totalAnte+totalPost+totalGynae;
+    var consultantRows = Object.entries(consultantCounts).sort(function(a,b){return b[1]-a[1];}).map(function(e){ return escapeHtml(e[0])+": "+e[1]; }).join(" &nbsp;|&nbsp; ");
+
+    var html = '<html><head><title>Ward Census — '+dateLabel+'</title><style>'+
+      'body{font-family:Arial,sans-serif;padding:20px 24px;color:#111;font-size:10pt;}'+
+      'h1{font-size:14pt;margin:0 0 2px;}'+
+      '.meta{font-size:9pt;color:#555;margin-bottom:12px;}'+
+      '.summary-box{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:14px;padding:10px 14px;background:#f4f6f8;border-radius:8px;border:1px solid #dde3e8;}'+
+      '.s{text-align:center;min-width:60px;} .sn{font-size:16pt;font-weight:700;line-height:1;} .sl{font-size:7.5pt;color:#555;text-transform:uppercase;letter-spacing:0.04em;margin-top:2px;}'+
+      'table{width:100%;border-collapse:collapse;font-size:9pt;}'+
+      'th{text-align:left;font-size:7.5pt;text-transform:uppercase;color:#555;border-bottom:2px solid #222;padding:4px 6px;background:#f9fafb;}'+
+      '@media print{button{display:none!important;}}'+
+      '</style></head><body>'+
+      '<div style="display:flex;justify-content:space-between;align-items:baseline;border-bottom:2px solid #111;padding-bottom:6px;margin-bottom:8px;">'+
+        '<div><h1>Patient Census Report</h1><div class="meta">'+escapeHtml(state.appTitle||"Ward Board")+' &nbsp;·&nbsp; '+dateLabel+'</div></div>'+
+        '<div style="font-size:9pt;color:#555;">Generated '+new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})+' by '+escapeHtml(getStaffName()||"Lead")+'</div>'+
+      '</div>'+
+      '<div class="summary-box">'+
+        '<div class="s"><div class="sn">'+grandTotal+'</div><div class="sl">Total</div></div>'+
+        '<div class="s"><div class="sn" style="color:#0d7a68;">'+totalAnte+'</div><div class="sl">Antenatal</div></div>'+
+        '<div class="s"><div class="sn" style="color:#6243a0;">'+totalPost+'</div><div class="sl">Postnatal</div></div>'+
+        '<div class="s"><div class="sn" style="color:#b05410;">'+totalGynae+'</div><div class="sl">Gynae</div></div>'+
+        '<div class="s"><div class="sn" style="color:#c0291f;">'+totalUrgent+'</div><div class="sl">Urgent</div></div>'+
+        '<div class="s"><div class="sn" style="color:#9e5f06;">'+totalReview+'</div><div class="sl">Review</div></div>'+
+        '<div class="s"><div class="sn" style="color:#1a5fa8;">'+totalStable+'</div><div class="sl">Stable</div></div>'+
+      '</div>'+
+      (consultantRows ? '<div style="font-size:9pt;margin-bottom:12px;color:#444;"><strong>By consultant:</strong> '+consultantRows+'</div>' : '')+
+      '<table><thead><tr>'+
+        '<th>Bed</th><th>Name / Age</th><th>Type</th><th>Diagnosis</th><th>Consultant</th><th>Acuity</th><th>Situation</th><th>Next review</th>'+
+      '</tr></thead><tbody>'+rows+'</tbody></table>'+
+      '<div style="margin-top:16px;font-size:8pt;color:#888;border-top:1px solid #ddd;padding-top:8px;">Ward Board v0.8 · For clinical workflow use during duty · Not a substitute for the EHR</div>'+
+      '</body></html>';
+
+    document.getElementById("censusOverlay").classList.remove("show");
+    var win = window.open("","_blank","width=900,height=700");
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    setTimeout(function(){ win.print(); }, 400);
+  };
+
+  /* ============================================================
+     FEATURE: KEYBOARD SHORTCUTS
+  ============================================================ */
+  var SHORTCUTS = [
+    {key:"N", desc:"New patient on selected bed / Add patient to empty bed"},
+    {key:"P", desc:"Progress update on last active patient"},
+    {key:"H", desc:"Open Handover Summary"},
+    {key:"1–5", desc:"Switch to ward tab 1, 2, 3, 4, or 5"},
+    {key:"Esc", desc:"Close any open modal"},
+    {key:"?", desc:"Show this shortcuts guide"},
+    {key:"Ctrl+D", desc:"Toggle dark / light mode"},
+  ];
+
+  function renderShortcutsList(){
+    var el = document.getElementById("shortcutsList");
+    if(!el) return;
+    el.innerHTML = SHORTCUTS.map(function(s){
+      return '<div style="display:flex;align-items:baseline;gap:12px;padding:7px 0;border-bottom:1px solid var(--line-soft);">'+
+        '<span style="font-family:monospace;background:var(--paper);border:1px solid var(--line);border-radius:5px;padding:2px 9px;font-size:0.82rem;font-weight:700;white-space:nowrap;flex-shrink:0;">'+escapeHtml(s.key)+'</span>'+
+        '<span style="font-size:0.84rem;color:var(--ink-2);">'+escapeHtml(s.desc)+'</span>'+
+        '</div>';
+    }).join("");
+  }
+
+  document.getElementById("closeShortcuts").onclick = function(){ document.getElementById("shortcutsOverlay").classList.remove("show"); };
+  document.getElementById("okShortcuts").onclick    = function(){ document.getElementById("shortcutsOverlay").classList.remove("show"); };
+
+  document.addEventListener("keydown", function(e){
+    // Don't fire when typing in an input/textarea
+    var tag = document.activeElement ? document.activeElement.tagName.toLowerCase() : "";
+    var inInput = (tag === "input" || tag === "textarea" || tag === "select" || document.activeElement.isContentEditable);
+    var anyModalOpen = document.querySelector(".overlay.show");
+
+    // Escape — close any open modal
+    if(e.key === "Escape"){
+      var open = document.querySelector(".overlay.show");
+      if(open) open.classList.remove("show");
+      return;
+    }
+    // ? — shortcuts guide
+    if(e.key === "?" && !inInput){
+      renderShortcutsList();
+      document.getElementById("shortcutsOverlay").classList.add("show");
+      return;
+    }
+    // Ctrl+D — dark mode toggle
+    if(e.key === "d" && (e.ctrlKey||e.metaKey)){
+      e.preventDefault();
+      document.getElementById("darkModeBtn").click();
+      return;
+    }
+    // Don't fire alpha shortcuts when in input or modal open
+    if(inInput || anyModalOpen) return;
+
+    // H — handover
+    if(e.key === "h" || e.key === "H"){ document.getElementById("exportSummaryBtn").click(); return; }
+
+    // 1-5 — ward tabs
+    var num = parseInt(e.key, 10);
+    if(num >= 1 && num <= 5 && state.wardOrder[num-1]){
+      activeWardId = state.wardOrder[num-1];
+      render();
+      return;
+    }
+  });
 
   /* ============================================================
      FEATURE: PUSH NOTIFICATIONS — header bell for ALL staff
@@ -3034,7 +3449,7 @@
     };
   }
 
-  /* HOD panel button — same action */
+  /* Lead panel button — same action */
   document.getElementById("hod_notifBtn").onclick = function(){
     requestNotifPermission(null);
   };
