@@ -524,76 +524,128 @@
     #cloudStatus { display: none; }
   }
 
-  /* ── Dark mode ─────────────────────────────────────────────── */
+  /* ── Dark mode vars ────────────────────────────────────────── */
+  /* Applied by: (a) OS dark preference when no manual override,
+                 (b) html[data-theme="dark"] manual toggle          */
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --_dark:1; } }
+  :root[data-theme="dark"] { --_dark:1; }
+
   @media (prefers-color-scheme: dark) {
-    :root {
-      --ink:         #e8edf1;
-      --ink-2:       #c8d4dc;
-      --ink-soft:    #8da0ae;
-      --ink-mute:    #5a6e7c;
-      --line:        #2a3a46;
-      --line-soft:   #1e2d38;
-      --paper:       #121e28;
-      --card:        #182331;
-      --header-bg:   #0a1520;
-      --header-2:    #0f1e2a;
+  :root:not([data-theme="light"]),
+  :root[data-theme="dark"] { --__placeholder__:0; } /* keep block open */
+  }
+  :root[data-theme="dark"],
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { } }
 
-      --accent:      #12a088;
-      --accent-mid:  #0e8a76;
-      --accent-soft: #0d2e28;
-      --accent-pale: #0a2420;
+  /* Single shared dark ruleset via both triggers */
+  :root[data-theme="dark"],
+  :root:not([data-theme="light"]) {
+    /* intentionally empty — vars applied below via each selector */
+  }
 
-      --red:         #f26b62;
-      --red-soft:    #2a1210;
-      --red-mid:     #6b2820;
-      --amber:       #e09040;
-      --amber-soft:  #2a1e08;
-      --amber-mid:   #6b4010;
-      --blue:        #5a9fd4;
-      --blue-soft:   #0e1e30;
-      --purple:      #9b7de0;
-      --purple-soft: #1a1030;
-      --gynae:       #e08050;
-      --gynae-soft:  #2a1408;
+  /* Dark tokens — applied via media query (no manual override) */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ink:#e8edf1; --ink-2:#c8d4dc; --ink-soft:#8da0ae; --ink-mute:#5a6e7c;
+      --line:#2a3a46; --line-soft:#1e2d38; --paper:#121e28; --card:#182331;
+      --header-bg:#0a1520; --header-2:#0f1e2a;
+      --accent:#12a088; --accent-mid:#0e8a76; --accent-soft:#0d2e28; --accent-pale:#0a2420;
+      --red:#f26b62; --red-soft:#2a1210; --red-mid:#6b2820;
+      --amber:#e09040; --amber-soft:#2a1e08; --amber-mid:#6b4010;
+      --blue:#5a9fd4; --blue-soft:#0e1e30;
+      --purple:#9b7de0; --purple-soft:#1a1030;
+      --gynae:#e08050; --gynae-soft:#2a1408;
     }
-    body::before { background: var(--header-bg); }
-    select, input, textarea {
-      background: #1a2d3a !important;
-      color: var(--ink) !important;
-      -webkit-text-fill-color: var(--ink);
-      border-color: var(--line);
-    }
-    .modal { background: var(--card); border-color: var(--line); }
-    .modal-foot { background: var(--paper); }
-    .btn-outline { background: var(--card); color: var(--ink-2); border-color: var(--line); }
-    .btn-outline:hover { background: var(--line-soft); }
-    .btn-danger-outline { background: var(--card); color: var(--red); border-color: var(--red-mid); }
-    .btn-danger-outline:hover { background: var(--red-soft); }
-    .modal-close { background: var(--line-soft); color: var(--ink-soft); border-color: var(--line); }
-    .modal-close:hover { background: var(--red-soft); color: var(--red); }
-    .checklist-grid { background: var(--accent-pale); border-color: #1a4038; }
-    .floor-map-bar { background: var(--card); border-color: var(--line); }
-    .ward-tabs { background: var(--header-2); }
-    .toolbar { background: var(--card); border-color: var(--line); }
-    .bed-card { background: var(--card); border-color: var(--line); }
-    .bed-card.empty { background: #101c28; border-color: #1e2d38; }
-    .bed-top { background: transparent; }
-    .bed-actions { background: var(--paper); border-color: var(--line); }
-    .admit-row { background: var(--paper); border-color: var(--line-soft); }
-    .history-entry { background: var(--paper); border-color: var(--line); }
-    .quick-note-banner { background: var(--accent-soft); border-color: #1a4038; }
-    .pill { background: var(--line-soft); color: var(--ink-soft); }
-    .pill.occ    { background: var(--accent-soft); color: var(--accent); }
-    .pill.urgent { background: var(--red-soft);    color: var(--red); }
-    .pill.review { background: var(--amber-soft);  color: var(--amber); }
-    .pill.stable { background: var(--blue-soft);   color: var(--blue); }
-    .stat-box { background: var(--card); border-color: var(--line); }
-    .hod-section { border-color: var(--line); }
-    .hist-entry { border-color: var(--line); }
-    #installBanner { background: #0a3028; }
-    #offlineBanner { background: #4a1210; }
-    footer { border-color: var(--line); }
-    input[type="time"]::-webkit-calendar-picker-indicator { filter: invert(1); }
+  }
+  /* Dark tokens — applied via manual toggle */
+  :root[data-theme="dark"] {
+    --ink:#e8edf1; --ink-2:#c8d4dc; --ink-soft:#8da0ae; --ink-mute:#5a6e7c;
+    --line:#2a3a46; --line-soft:#1e2d38; --paper:#121e28; --card:#182331;
+    --header-bg:#0a1520; --header-2:#0f1e2a;
+    --accent:#12a088; --accent-mid:#0e8a76; --accent-soft:#0d2e28; --accent-pale:#0a2420;
+    --red:#f26b62; --red-soft:#2a1210; --red-mid:#6b2820;
+    --amber:#e09040; --amber-soft:#2a1e08; --amber-mid:#6b4010;
+    --blue:#5a9fd4; --blue-soft:#0e1e30;
+    --purple:#9b7de0; --purple-soft:#1a1030;
+    --gynae:#e08050; --gynae-soft:#2a1408;
+  }
+  /* Dark element overrides — shared */
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) body::before,
+  :root:not([data-theme="light"]) body::before { background: var(--header-bg); } }
+  :root[data-theme="dark"] body::before { background: var(--header-bg); }
+
+  .dark-els,
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) select,
+  :root:not([data-theme="light"]) input,
+  :root:not([data-theme="light"]) textarea { background: #1a2d3a !important; color: var(--ink) !important; -webkit-text-fill-color: var(--ink); border-color: var(--line); } }
+  :root[data-theme="dark"] select,
+  :root[data-theme="dark"] input,
+  :root[data-theme="dark"] textarea { background: #1a2d3a !important; color: var(--ink) !important; -webkit-text-fill-color: var(--ink); border-color: var(--line); }
+  :root[data-theme="dark"] input[type="time"]::-webkit-calendar-picker-indicator { filter: invert(1); }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) input[type="time"]::-webkit-calendar-picker-indicator { filter: invert(1); } }
+
+  :root[data-theme="dark"] .modal,
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .modal { background: var(--card); border-color: var(--line); } }
+  :root[data-theme="dark"] .modal { background: var(--card); border-color: var(--line); }
+  :root[data-theme="dark"] .modal-foot { background: var(--paper); }
+  :root[data-theme="dark"] .btn-outline { background: var(--card); color: var(--ink-2); border-color: var(--line); }
+  :root[data-theme="dark"] .btn-outline:hover { background: var(--line-soft); }
+  :root[data-theme="dark"] .btn-danger-outline { background: var(--card); color: var(--red); border-color: var(--red-mid); }
+  :root[data-theme="dark"] .btn-danger-outline:hover { background: var(--red-soft); }
+  :root[data-theme="dark"] .modal-close { background: var(--line-soft); color: var(--ink-soft); border-color: var(--line); }
+  :root[data-theme="dark"] .modal-close:hover { background: var(--red-soft); color: var(--red); }
+  :root[data-theme="dark"] .checklist-grid { background: var(--accent-pale); border-color: #1a4038; }
+  :root[data-theme="dark"] .floor-map-bar { background: var(--card); border-color: var(--line); }
+  :root[data-theme="dark"] .ward-tabs { background: var(--header-2); }
+  :root[data-theme="dark"] .toolbar { background: var(--card); border-color: var(--line); }
+  :root[data-theme="dark"] .bed-card { background: var(--card); border-color: var(--line); }
+  :root[data-theme="dark"] .bed-card.empty { background: #101c28; border-color: #1e2d38; }
+  :root[data-theme="dark"] .bed-actions { background: var(--paper); border-color: var(--line); }
+  :root[data-theme="dark"] .admit-row { background: var(--paper); border-color: var(--line-soft); }
+  :root[data-theme="dark"] .history-entry { background: var(--paper); border-color: var(--line); }
+  :root[data-theme="dark"] .quick-note-banner { background: var(--accent-soft); border-color: #1a4038; }
+  :root[data-theme="dark"] .pill { background: var(--line-soft); color: var(--ink-soft); }
+  :root[data-theme="dark"] .pill.occ    { background: var(--accent-soft); color: var(--accent); }
+  :root[data-theme="dark"] .pill.urgent { background: var(--red-soft);    color: var(--red); }
+  :root[data-theme="dark"] .pill.review { background: var(--amber-soft);  color: var(--amber); }
+  :root[data-theme="dark"] .pill.stable { background: var(--blue-soft);   color: var(--blue); }
+  :root[data-theme="dark"] .stat-box { background: var(--card); border-color: var(--line); }
+  :root[data-theme="dark"] .hod-section { border-color: var(--line); }
+  :root[data-theme="dark"] .hist-entry { border-color: var(--line); }
+  :root[data-theme="dark"] #installBanner { background: #0a3028; }
+  :root[data-theme="dark"] #offlineBanner { background: #4a1210; }
+  :root[data-theme="dark"] footer { border-color: var(--line); }
+
+  /* Keep original media query element overrides for OS-level dark */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) body::before { background: var(--header-bg); }
+    :root:not([data-theme="light"]) .modal { background: var(--card); border-color: var(--line); }
+    :root:not([data-theme="light"]) .modal-foot { background: var(--paper); }
+    :root:not([data-theme="light"]) .btn-outline { background: var(--card); color: var(--ink-2); border-color: var(--line); }
+    :root:not([data-theme="light"]) .btn-outline:hover { background: var(--line-soft); }
+    :root:not([data-theme="light"]) .btn-danger-outline { background: var(--card); color: var(--red); border-color: var(--red-mid); }
+    :root:not([data-theme="light"]) .modal-close { background: var(--line-soft); color: var(--ink-soft); border-color: var(--line); }
+    :root:not([data-theme="light"]) .checklist-grid { background: var(--accent-pale); border-color: #1a4038; }
+    :root:not([data-theme="light"]) .floor-map-bar { background: var(--card); border-color: var(--line); }
+    :root:not([data-theme="light"]) .ward-tabs { background: var(--header-2); }
+    :root:not([data-theme="light"]) .toolbar { background: var(--card); border-color: var(--line); }
+    :root:not([data-theme="light"]) .bed-card { background: var(--card); border-color: var(--line); }
+    :root:not([data-theme="light"]) .bed-card.empty { background: #101c28; border-color: #1e2d38; }
+    :root:not([data-theme="light"]) .bed-actions { background: var(--paper); border-color: var(--line); }
+    :root:not([data-theme="light"]) .admit-row { background: var(--paper); border-color: var(--line-soft); }
+    :root:not([data-theme="light"]) .history-entry { background: var(--paper); border-color: var(--line); }
+    :root:not([data-theme="light"]) .quick-note-banner { background: var(--accent-soft); border-color: #1a4038; }
+    :root:not([data-theme="light"]) .pill { background: var(--line-soft); color: var(--ink-soft); }
+    :root:not([data-theme="light"]) .pill.occ { background: var(--accent-soft); color: var(--accent); }
+    :root:not([data-theme="light"]) .pill.urgent { background: var(--red-soft); color: var(--red); }
+    :root:not([data-theme="light"]) .pill.review { background: var(--amber-soft); color: var(--amber); }
+    :root:not([data-theme="light"]) .pill.stable { background: var(--blue-soft); color: var(--blue); }
+    :root:not([data-theme="light"]) .stat-box { background: var(--card); border-color: var(--line); }
+    :root:not([data-theme="light"]) .hod-section { border-color: var(--line); }
+    :root:not([data-theme="light"]) .hist-entry { border-color: var(--line); }
+    :root:not([data-theme="light"]) #installBanner { background: #0a3028; }
+    :root:not([data-theme="light"]) #offlineBanner { background: #4a1210; }
+    :root:not([data-theme="light"]) footer { border-color: var(--line); }
   }
 
   /* Bell notification button */
@@ -674,6 +726,7 @@
     <span id="cloudStatus">☁️ Connecting…</span>
     <button class="btn-ghost btn-small" id="staffNameBtn">👤 Set name</button>
     <button class="btn-ghost btn-small btn-notif" id="notifHeaderBtn" title="Enable urgent alerts on this device" aria-label="Enable notifications">🔔</button>
+    <button class="btn-ghost btn-small" id="darkModeBtn" title="Toggle dark mode" aria-label="Toggle dark mode">🌙</button>
     <button class="btn-ghost btn-small btn-hod" id="hodBtn">🔑 HOD</button>
     <button class="btn-ghost btn-small" id="exportSummaryBtn">📋 Handover</button>
     <button class="btn-ghost btn-small" id="printBtn">🖨️ Print</button>
@@ -682,6 +735,10 @@
 
 <div id="offlineBanner" style="display:none;background:#8f1d18;color:#fff;text-align:center;font-size:0.82rem;padding:7px 16px;font-weight:500;">
   ⚠️ You are offline — changes will sync automatically when reconnected.
+</div>
+<div id="saveFailBanner" style="display:none;background:#7a1a0f;color:#fff;padding:9px 16px;font-size:0.82rem;display:none;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+  <span>❌ <strong>Save failed</strong> — changes may not have synced. Check your connection.</span>
+  <button onclick="document.getElementById('saveFailBanner').style.display='none';saveState();" style="background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.3);border-radius:5px;padding:4px 12px;font-size:0.78rem;cursor:pointer;font-weight:600;">Retry</button>
 </div>
 
 <div id="installBanner">
@@ -731,7 +788,7 @@
 <div id="grid"></div>
 
 <footer>
-  <div style="margin-bottom:4px;">🩺 Ward Board &nbsp;·&nbsp; <span id="appVersion">v0.6 · test build</span></div>
+  <div style="margin-bottom:4px;">🩺 Ward Board &nbsp;·&nbsp; <span id="appVersion">v0.7 · test build</span></div>
   <div>For clinical workflow support during duty — not a substitute for the EHR</div>
 </footer>
 
@@ -781,15 +838,8 @@
           <input type="text" id="f_age" placeholder="e.g. 29y">
         </div>
         <div class="form-field">
-          <label>Unit</label>
-          <select id="f_unit">
-            <option value="">—</option>
-            <option value="A">Unit A</option>
-            <option value="B">Unit B</option>
-            <option value="C">Unit C</option>
-            <option value="D">Unit D</option>
-            <option value="E">Unit E</option>
-          </select>
+          <label>Consultant / Team</label>
+          <select id="f_unit"></select>
         </div>
       </div>
 
@@ -1104,6 +1154,24 @@
         <div id="hod_histLog" style="max-height:280px;overflow-y:auto;border:1px solid var(--line);border-radius:8px;font-size:0.82rem;"></div>
       </div>
 
+      <!-- Section: Ward bed counts -->
+      <div class="hod-section">
+        <div class="hod-section-title">🛏️ Beds per ward</div>
+        <p style="font-size:0.82rem;color:var(--ink-soft);margin:0 0 10px;">Set how many rooms each ward has (1–30). Changes take effect immediately.</p>
+        <div id="hod_bedCountList" style="display:flex;flex-direction:column;gap:6px;"></div>
+      </div>
+
+      <!-- Section: Consultant list -->
+      <div class="hod-section">
+        <div class="hod-section-title">👨‍⚕️ Consultants / Teams</div>
+        <p style="font-size:0.82rem;color:var(--ink-soft);margin:0 0 10px;">Define the consultant / team list. Staff pick from this dropdown when admitting.</p>
+        <div id="hod_consultantList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;"></div>
+        <div style="display:flex;gap:8px;">
+          <input type="text" id="hod_newConsultant" placeholder="e.g. Dr Hassan" style="flex:1;">
+          <button class="btn-primary" id="hod_addConsultant">Add</button>
+        </div>
+      </div>
+
       <!-- Section: Stats -->
       <div class="hod-section">
         <div class="hod-section-title">📊 Statistics</div>
@@ -1204,6 +1272,7 @@
       });
     }
 
+    if(!Array.isArray(s.consultants)) s.consultants = [];
     s.wardOrder.forEach(function(id){
       var w = s.wards[id];
       if(!w.rooms || typeof w.rooms !== "object") w.rooms = {};
@@ -1380,14 +1449,12 @@
   function openHodPanel(){
     var ov = document.getElementById("hodPanelOverlay");
     if(!ov) return;
-    // Populate app title
     var ti = document.getElementById("hod_appTitle");
     if(ti) ti.value = state.appTitle || "Ward Board";
-    // Populate ward list
     renderHodWardList();
-    // Populate ward filter dropdown in history
+    renderHodBedCounts();
+    renderHodConsultantList();
     renderHodHistWardFilter();
-    // Render history
     renderHodHistory();
     ov.classList.add("show");
   }
@@ -1405,6 +1472,77 @@
     var btn = document.getElementById("hod_saveTitle");
     btn.textContent = "✓ Saved"; setTimeout(function(){ btn.textContent = "Save title"; }, 1500);
   };
+
+  /* Bed count per ward */
+  function renderHodBedCounts(){
+    var container = document.getElementById("hod_bedCountList");
+    if(!container) return;
+    container.innerHTML = "";
+    state.wardOrder.forEach(function(id){
+      var w = state.wards[id]; if(!w) return;
+      var row = document.createElement("div");
+      row.className = "hod-ward-row";
+      var lbl = document.createElement("span");
+      lbl.textContent = w.name;
+      lbl.style.cssText = "font-size:0.84rem;font-weight:600;flex:1;min-width:100px;";
+      var inp = document.createElement("input");
+      inp.type = "number"; inp.min = "1"; inp.max = "30";
+      inp.value = w.roomCount || ROOMS_PER_WARD;
+      inp.style.cssText = "width:70px;text-align:center;";
+      var saveBtn = document.createElement("button");
+      saveBtn.className = "btn-outline"; saveBtn.textContent = "Save";
+      saveBtn.onclick = function(){
+        var val = parseInt(inp.value,10);
+        if(!val || val < 1 || val > 30) return;
+        w.roomCount = val;
+        saveState(); render();
+        saveBtn.textContent = "✓"; setTimeout(function(){ saveBtn.textContent = "Save"; }, 1200);
+      };
+      row.appendChild(lbl); row.appendChild(inp); row.appendChild(saveBtn);
+      container.appendChild(row);
+    });
+  }
+
+  /* Consultant / team list */
+  function renderHodConsultantList(){
+    var container = document.getElementById("hod_consultantList");
+    if(!container) return;
+    container.innerHTML = "";
+    var list = getConsultants();
+    if(!list.length){
+      container.innerHTML = '<div style="font-size:0.8rem;color:var(--ink-mute);">No consultants defined yet.</div>';
+      return;
+    }
+    list.forEach(function(c, i){
+      var row = document.createElement("div");
+      row.style.cssText = "display:flex;gap:8px;align-items:center;";
+      var lbl = document.createElement("span");
+      lbl.textContent = c; lbl.style.cssText = "flex:1;font-size:0.84rem;";
+      var del = document.createElement("button");
+      del.className = "btn-danger-outline btn-small"; del.textContent = "Remove";
+      del.onclick = function(){
+        state.consultants.splice(i, 1);
+        saveState();
+        renderHodConsultantList();
+      };
+      row.appendChild(lbl); row.appendChild(del);
+      container.appendChild(row);
+    });
+  }
+
+  document.getElementById("hod_addConsultant").onclick = function(){
+    var inp = document.getElementById("hod_newConsultant");
+    var val = (inp.value||"").trim();
+    if(!val) return;
+    if(!state.consultants) state.consultants = [];
+    if(!state.consultants.includes(val)) state.consultants.push(val);
+    inp.value = "";
+    saveState();
+    renderHodConsultantList();
+  };
+  document.getElementById("hod_newConsultant").addEventListener("keydown", function(e){
+    if(e.key==="Enter") document.getElementById("hod_addConsultant").click();
+  });
 
   /* Ward rename list */
   function renderHodWardList(){
@@ -1532,6 +1670,63 @@
   function var_red(){ return "var(--red)"; }
 
   /* ============================================================ */
+
+  /* ============================================================
+     DARK MODE TOGGLE
+  ============================================================ */
+  var THEME_KEY = "wb_theme";
+  function getEffectiveTheme(){
+    var stored = localStorage.getItem(THEME_KEY);
+    if(stored) return stored;
+    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }
+  function applyTheme(theme){
+    document.documentElement.setAttribute("data-theme", theme);
+    localStorage.setItem(THEME_KEY, theme);
+    var btn = document.getElementById("darkModeBtn");
+    if(btn) btn.textContent = theme === "dark" ? "☀️" : "🌙";
+    btn && (btn.title = theme === "dark" ? "Switch to light mode" : "Switch to dark mode");
+  }
+  // Apply on load
+  applyTheme(getEffectiveTheme());
+  document.getElementById("darkModeBtn").onclick = function(){
+    var current = document.documentElement.getAttribute("data-theme") || getEffectiveTheme();
+    applyTheme(current === "dark" ? "light" : "dark");
+  };
+
+  /* ============================================================
+     SAVE FAILURE BANNER
+  ============================================================ */
+  function showSaveFailBanner(){ document.getElementById("saveFailBanner").style.display = "flex"; }
+  function hideSaveFailBanner(){ document.getElementById("saveFailBanner").style.display = "none"; }
+  window.showSaveFailBanner = showSaveFailBanner;
+  window.hideSaveFailBanner = hideSaveFailBanner;
+
+  /* ============================================================
+     CONSULTANT DROPDOWN — population helpers
+  ============================================================ */
+  function getConsultants(){
+    return state.consultants && state.consultants.length ? state.consultants : [];
+  }
+  function populateConsultantDropdown(currentVal){
+    var sel = document.getElementById("f_unit");
+    if(!sel) return;
+    var consultants = getConsultants();
+    sel.innerHTML = '<option value="">— Select —</option>';
+    consultants.forEach(function(c){
+      var opt = document.createElement("option");
+      opt.value = c; opt.textContent = c;
+      if(c === currentVal) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    // If current value isn't in list (legacy free-text), add it
+    if(currentVal && !consultants.includes(currentVal)){
+      var opt = document.createElement("option");
+      opt.value = currentVal; opt.textContent = currentVal + " (custom)";
+      opt.selected = true;
+      sel.appendChild(opt);
+    }
+  }
 
   /* Returns the staff name, or null if not set (callers must handle null) */
   function ensureStaffName(){
@@ -1689,7 +1884,8 @@
   function getWardOccupancy(wardId){
     var w = state.wards[wardId]; if(!w||!w.rooms) return {occ:0,total:0};
     var occ=0, total=0;
-    for(var r=1;r<=ROOMS_PER_WARD;r++){
+    var rc = w.roomCount || ROOMS_PER_WARD;
+    for(var r=1;r<=rc;r++){
       var hasB = (w.roomConfig&&w.roomConfig[r]&&w.roomConfig[r].hasB)||!!w.rooms[r+"B"];
       var beds = hasB?["A","B"]:["A"];
       beds.forEach(function(b){ total++; if(w.rooms[r+b]) occ++; });
@@ -1725,7 +1921,7 @@
     bar.innerHTML = '<span class="floor-map-label">Quick Jump:</span>';
     var w = currentWard();
 
-    for(var r=1; r<=ROOMS_PER_WARD; r++){
+    var fmrc = (currentWard().roomCount||ROOMS_PER_WARD); for(var r=1; r<=fmrc; r++){
       var pill = document.createElement("a");
       pill.className = "room-pill";
       pill.textContent = r;
@@ -1762,8 +1958,9 @@
 
     var occCount=0, urgentCount=0, reviewCount=0, stableCount=0;
     var w = currentWard();
+    var _rc = w.roomCount || ROOMS_PER_WARD;
 
-    for(var r=1; r<=ROOMS_PER_WARD; r++){
+    for(var r=1; r<=_rc; r++){
       var hasB = (w.roomConfig && w.roomConfig[r] && w.roomConfig[r].hasB) || !!w.rooms[r+"B"];
       var beds = hasB ? ["A", "B"] : ["A"];
       beds.forEach(function(bed){
@@ -1790,7 +1987,8 @@
       document.getElementById("pillStable").onclick = function(){ activeAcuityFilter = activeAcuityFilter==="stable"?"":"stable"; render(); };
     }
 
-    for(var room=1; room<=ROOMS_PER_WARD; room++){
+    var _wrc = w.roomCount || ROOMS_PER_WARD;
+    for(var room=1; room<=_wrc; room++){
       if(!w.roomConfig[room]) w.roomConfig[room] = { hasB: !!w.rooms[room+"B"] };
       if(w.rooms[room+"B"]) w.roomConfig[room].hasB = true;
 
@@ -1905,7 +2103,22 @@
     var displaySituation = lastEntry ? lastEntry.situation : patient.situation;
     var displayPlan = lastEntry ? lastEntry.plan : patient.plan;
 
-    var html = '<div class="patient-name-row"><span class="pname">'+escapeHtml(patient.name || "Unnamed")+'</span>'+(patient.age?'<span class="meta">'+escapeHtml(patient.age)+'</span>':'')+'</div>';
+    var html = '';
+    // Transfer badge
+    if(patient.transferredFrom){
+      var txTime = patient.transferredAt ? ' · '+fmtTimeShort(patient.transferredAt) : '';
+      var txBy   = patient.transferredBy ? ' by '+escapeHtml(patient.transferredBy) : '';
+      html += '<div style="font-size:0.7rem;background:var(--purple-soft);color:var(--purple);border-radius:6px;padding:3px 9px;margin-bottom:4px;font-weight:600;">🔀 Transferred from '+escapeHtml(patient.transferredFrom)+txTime+txBy+'</div>';
+    }
+    // Next review due
+    var displayNextReview = lastEntry ? lastEntry.nextReview : patient.nextReview;
+    if(displayNextReview){
+      var nrDate = new Date(displayNextReview);
+      var nrStr = !isNaN(nrDate.getTime()) ? nrDate.toLocaleString([],{weekday:'short',hour:'2-digit',minute:'2-digit',day:'2-digit',month:'short'}) : escapeHtml(displayNextReview);
+      var nrOverdue = isOverdue(patient);
+      html += '<div style="font-size:0.7rem;padding:3px 9px;border-radius:6px;margin-bottom:4px;font-weight:600;background:'+(nrOverdue?'var(--red-soft)':'var(--amber-soft)')+';color:'+(nrOverdue?'var(--red)':'var(--amber)')+';">⏰ Review: '+nrStr+'</div>';
+    }
+    html += '<div class="patient-name-row"><span class="pname">'+escapeHtml(patient.name || "Unnamed")+'</span>'+(patient.age?'<span class="meta">'+escapeHtml(patient.age)+'</span>':'')+'</div>';
     html += '<div class="field"><label>Diagnosis</label><div class="value">'+(patient.diagnosis?escapeHtml(patient.diagnosis):'<span class="empty-val">Not recorded</span>')+'</div></div>';
     html += '<div class="field"><label>Current situation</label><div class="value">'+(displaySituation?escapeHtml(displaySituation):'<span class="empty-val">Not recorded</span>')+'</div></div>';
     html += '<div class="field"><label>Plan</label><div class="value">'+(displayPlan?escapeHtml(displayPlan):'<span class="empty-val">Not recorded</span>')+'</div></div>';
@@ -2038,6 +2251,8 @@
     setVal("f_diagnosis", patient ? patient.diagnosis : "");
     setVal("f_situation", patient ? patient.situation : "");
     setVal("f_plan", patient ? patient.plan : "");
+    // Populate consultant dropdown
+    populateConsultantDropdown(patient ? patient.unit : "");
     // Load nextReview into time picker
     var rv = parseReviewISO(patient ? patient.nextReview : "");
     var fNR = document.getElementById("f_nextReview");
@@ -2234,7 +2449,8 @@
       var w = state.wards[wardId];
       if(!w || !w.rooms) return;
       var rows = [];
-      for(var r=1; r<=ROOMS_PER_WARD; r++){
+      var _hrc = w.roomCount || ROOMS_PER_WARD;
+      for(var r=1; r<=_hrc; r++){
         var hasB = (w.roomConfig && w.roomConfig[r] && w.roomConfig[r].hasB) || !!w.rooms[r+"B"];
         var beds = hasB ? ["A", "B"] : ["A"];
         beds.forEach(function(bed){
@@ -2246,7 +2462,7 @@
 
       html += '<div class="summary-ward-block"><div class="summary-ward-title">'+escapeHtml(w.name)+' ('+rows.length+' patients)</div>';
       html += '<table class="summary-table"><thead><tr>' +
-        '<th>Bed</th><th>Name</th><th>Type</th><th>Unit</th><th>Diagnosis</th><th>Situation / Plan</th><th>Next review</th>' +
+        '<th>Bed</th><th>Name / Age</th><th>Type</th><th>Consultant</th><th>Diagnosis</th><th>Situation / Plan</th><th>Next review</th><th>Acuity</th>' +
         '</tr></thead><tbody>';
 
       rows.forEach(function(row){
@@ -2257,14 +2473,28 @@
         var nextReview = lastEntry && lastEntry.nextReview !== undefined ? lastEntry.nextReview : p.nextReview;
         var combined = [situation, plan].filter(Boolean).join(" — ");
 
+        // Format next review
+        var nrFormatted = "—";
+        if(nextReview){
+          var nrD = new Date(nextReview);
+          nrFormatted = !isNaN(nrD.getTime())
+            ? nrD.toLocaleString([],{weekday:'short',hour:'2-digit',minute:'2-digit',day:'2-digit',month:'short'})
+            : escapeHtml(nextReview);
+          if(isOverdue(p)) nrFormatted = '⏰ ' + nrFormatted + ' (OVERDUE)';
+        }
+
+        // Transfer indicator
+        var txNote = p.transferredFrom ? ' <span style="color:#6243a0;font-size:7.5px;">⟵ '+escapeHtml(p.transferredFrom)+'</span>' : '';
+
         html += '<tr>' +
-          '<td class="bed-col"><span class="acuity-dot '+p.acuity+'"></span>'+row.room+row.bed+'</td>' +
-          '<td>'+escapeHtml(p.name||"—")+(p.age?(' <span style="color:#777;">'+escapeHtml(p.age)+'</span>'):'')+'</td>' +
+          '<td><span class="acuity-dot '+p.acuity+'"></span>'+row.room+row.bed+'</td>' +
+          '<td>'+escapeHtml(p.name||"—")+txNote+(p.age?' <span style="color:#777;">'+escapeHtml(p.age)+'</span>':'')+'</td>' +
           '<td>'+(TYPE_LABEL[p.type]||"—")+'</td>' +
           '<td>'+escapeHtml(p.unit||"—")+'</td>' +
           '<td>'+escapeHtml(p.diagnosis||"—")+'</td>' +
           '<td>'+escapeHtml(combined||"—")+'</td>' +
-          '<td>'+escapeHtml(nextReview||"—")+'</td>' +
+          '<td style="'+(isOverdue(p)?'color:#c0291f;font-weight:700;':'')+'">'+nrFormatted+'</td>' +
+          '<td><span class="acuity-dot '+p.acuity+'"></span>'+(ACUITY_LABEL[p.acuity]||"Stable")+'</td>' +
           '</tr>';
       });
       html += '</tbody></table></div>';
@@ -2321,7 +2551,8 @@
       '<th>Room / Bed</th><th>Status / Patient</th><th>Type / Unit</th><th>Acuity</th><th>Diagnosis & Situation</th><th>Plan & Next Review</th>' +
       '</tr></thead><tbody>';
 
-    for(var r=1; r<=ROOMS_PER_WARD; r++){
+    var _fprc = w.roomCount || ROOMS_PER_WARD;
+    for(var r=1; r<=_fprc; r++){
       var hasB = (w.roomConfig && w.roomConfig[r] && w.roomConfig[r].hasB) || !!w.rooms[r+"B"];
       var beds = hasB ? ["A", "B"] : ["A"];
       beds.forEach(function(bed){
@@ -2505,7 +2736,8 @@
     var bedSel = document.getElementById("transferBedSelect");
     bedSel.innerHTML = "";
     var w = state.wards[wardId]; if(!w) return;
-    for(var r=1; r<=ROOMS_PER_WARD; r++){
+    var _trc = w.roomCount || ROOMS_PER_WARD;
+    for(var r=1; r<=_trc; r++){
       ["A","B"].forEach(function(b){
         var key = r+b;
         if(b==="B" && !(w.roomConfig&&w.roomConfig[r]&&w.roomConfig[r].hasB) && !w.rooms[key]) return;
@@ -2950,16 +3182,12 @@
         }
         const cleanPayload = JSON.parse(JSON.stringify(stateData));
         set(boardRef, cleanPayload).then(function(){
-          if(statusEl) {
-            statusEl.textContent = "⚡ Live Sync Active";
-            statusEl.style.color = "#a2f2c8";
-          }
+          if(statusEl){ statusEl.textContent = "⚡ Live Sync Active"; statusEl.style.color = "#a2f2c8"; }
+          if(window.hideSaveFailBanner) window.hideSaveFailBanner();
         }).catch(function(err){
           console.error("Firebase save error:", err);
-          if(statusEl) {
-            statusEl.textContent = "❌ Save Error";
-            statusEl.style.color = "#ffb3b3";
-          }
+          if(statusEl){ statusEl.textContent = "❌ Save Error"; statusEl.style.color = "#ffb3b3"; }
+          if(window.showSaveFailBanner) window.showSaveFailBanner();
         });
       }
     };
