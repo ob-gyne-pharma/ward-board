@@ -9,9 +9,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Ward Board">
 <meta name="application-name" content="Ward Board">
-<meta name="description" content="OB-Gyne Ward Board — patient tracking and handover tool">
-<link rel="apple-touch-icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect width='180' height='180' rx='40' fill='%231a2430'/><text x='90' y='125' font-size='100' text-anchor='middle'>🩺</text></svg>">
+<meta name="description" content="OB-Gyne Ward Board — patient tracking and handover tool"><rect width='180' height='180' rx='40' fill='%231a2430'/><text x='90' y='125' font-size='100' text-anchor='middle'>🩺</text></svg>">
   <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon.svg">
   <link rel="stylesheet" href="app.css">
 </head>
 <body>
@@ -723,12 +723,11 @@
   <script src="app.js"></script>
   <script type="module" src="firebase-sync.js"></script>
   <script>
-    // Register service worker
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", function () {
         navigator.serviceWorker.register("./sw.js")
-          .then(function(reg){ console.log("SW registered:", reg.scope); })
-          .catch(function(err){ console.warn("SW registration failed:", err); });
+          .then(function(reg){ console.log("[SW] Registered:", reg.scope); })
+          .catch(function(err){ console.warn("[SW] Failed:", err); });
       });
     }
   </script>

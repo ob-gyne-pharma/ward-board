@@ -1,5 +1,4 @@
 /* Ward Board — app.js — v1.1 */
-
 (function(){
   "use strict";
 
@@ -2350,7 +2349,7 @@
     var data = JSON.stringify({
       exportedAt: nowISO(),
       exportedBy: getStaffName()||"Lead",
-      appVersion: "v0.8",
+      appVersion: "v1.1",
       state: state
     }, null, 2);
     var blob = new Blob([data], {type:"application/json"});
@@ -2470,7 +2469,7 @@
       '<table><thead><tr>'+
         '<th>Bed</th><th>Name / Age</th><th>Type</th><th>Diagnosis</th><th>Consultant</th><th>Acuity</th><th>Situation</th><th>Next review</th>'+
       '</tr></thead><tbody>'+rows+'</tbody></table>'+
-      '<div style="margin-top:16px;font-size:8pt;color:#888;border-top:1px solid #ddd;padding-top:8px;">Ward Board v0.8 · For clinical workflow use during duty · Not a substitute for the EHR</div>'+
+      '<div style="margin-top:16px;font-size:8pt;color:#888;border-top:1px solid #ddd;padding-top:8px;">Ward Board v1.1 · For clinical workflow use during duty · Not a substitute for the EHR</div>'+
       '</body></html>';
 
     document.getElementById("censusOverlay").classList.remove("show");
