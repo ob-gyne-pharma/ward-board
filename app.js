@@ -691,13 +691,13 @@
       bar.appendChild(empty);
     } else {
       staff.forEach(function(s){
-        if(!s.name && !s.bleep) return;
+        if(!s.name) return;
         var seg = document.createElement("span");
         seg.style.cssText = "display:inline-flex;align-items:baseline;gap:4px;white-space:nowrap;";
         seg.innerHTML =
           '<span class="oncall-label">'+escapeHtml(s.role||"")+'</span>' +
           '<span class="oncall-name">'+escapeHtml(s.name||"—")+'</span>' +
-          (s.bleep ? '<span class="oncall-bleep">🔔'+escapeHtml(s.bleep)+'</span>' : '');
+          (s.ward ? '<span class="oncall-ward">&nbsp;('+escapeHtml(s.ward)+')</span>' : '');
         bar.appendChild(seg);
       });
     }
@@ -706,7 +706,7 @@
 
   function openOnCallModal(){
     if(!state.onCallStaff || !state.onCallStaff.length){
-      state.onCallStaff = DEFAULT_ONCALL_ROLES.map(function(r){ return {role:r,name:"",bleep:""}; });
+      state.onCallStaff = DEFAULT_ONCALL_ROLES.map(function(r){ return {role:r,name:"",ward:""}; });
     }
     renderOnCallFields();
     document.getElementById("onCallOverlay").classList.add("show");
@@ -718,11 +718,11 @@
     container.innerHTML = "";
     (state.onCallStaff||[]).forEach(function(s, i){
       var row = document.createElement("div");
-      row.style.cssText = "display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:6px;align-items:center;";
+      row.style.cssText = "display:grid;grid-template-columns:1fr 1fr 1.2fr auto;gap:6px;align-items:center;";
       row.innerHTML =
-        '<input type="text" placeholder="Role" value="'+escapeHtml(s.role||"")+'" data-idx="'+i+'" data-field="role" style="font-size:0.8rem;">' +
+        '<input type="text" placeholder="Role (e.g. Registrar)" value="'+escapeHtml(s.role||"")+'" data-idx="'+i+'" data-field="role" style="font-size:0.8rem;">' +
         '<input type="text" placeholder="Name / Initials" value="'+escapeHtml(s.name||"")+'" data-idx="'+i+'" data-field="name" style="font-size:0.8rem;" maxlength="30">' +
-        '<input type="text" placeholder="Bleep / ext." value="'+escapeHtml(s.bleep||"")+'" data-idx="'+i+'" data-field="bleep" style="font-size:0.8rem;" maxlength="10">' +
+        '<input type="text" placeholder="Ward / Rooms (e.g. Ward A, 1-12)" value="'+escapeHtml(s.ward||"")+'" data-idx="'+i+'" data-field="ward" style="font-size:0.8rem;" maxlength="40">' +
         '<button class="btn-danger-outline btn-small oncall-del" data-idx="'+i+'" style="white-space:nowrap;padding:6px 8px;">✕</button>';
       container.appendChild(row);
     });
@@ -744,7 +744,7 @@
 
   document.getElementById("addOnCallRole").onclick = function(){
     if(!state.onCallStaff) state.onCallStaff = [];
-    state.onCallStaff.push({role:"",name:"",bleep:""});
+    state.onCallStaff.push({role:"",name:"",ward:""});
     renderOnCallFields();
   };
   document.getElementById("closeOnCall").onclick  = function(){ document.getElementById("onCallOverlay").classList.remove("show"); };
@@ -2739,29 +2739,6 @@
     // Reset so same file can be re-selected
     e.target.value = "";
   };
-
-  /* ============================================================
-     FEATURE: ARABIC / RTL SUPPORT
-  ============================================================ */
-  var LANG_KEY = "wb_lang";
-  function applyLang(lang){
-    document.documentElement.setAttribute("lang", lang);
-    document.documentElement.setAttribute("dir", lang === "ar" ? "rtl" : "ltr");
-    localStorage.setItem(LANG_KEY, lang);
-    var btn = document.getElementById("langToggleBtn");
-    if(btn) btn.textContent = lang === "ar" ? "EN" : "عر";
-    if(btn) btn.title = lang === "ar" ? "Switch to English" : "التبديل إلى العربية";
-  }
-  applyLang(localStorage.getItem(LANG_KEY) || "en");
-
-  var langBtn = document.getElementById("langToggleBtn");
-  if(langBtn){
-    langBtn.onclick = function(){
-      var current = document.documentElement.getAttribute("lang") || "en";
-      applyLang(current === "ar" ? "en" : "ar");
-    };
-  }
-
   /* ============================================================
      FEATURE: PUSH NOTIFICATIONS — header bell for ALL staff
   ============================================================ */

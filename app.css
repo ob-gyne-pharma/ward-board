@@ -524,33 +524,6 @@
     #cloudStatus { display: none; }
   }
 
-  /* ── Arabic / RTL support ──────────────────────────────────── */
-  [dir="rtl"] body { font-family: -apple-system, "Segoe UI", "Tahoma", "Arabic UI", sans-serif; }
-  [dir="rtl"] .brand { flex-direction: row-reverse; }
-  [dir="rtl"] .header-actions { flex-direction: row-reverse; }
-  [dir="rtl"] .ward-tabs { flex-direction: row-reverse; }
-  [dir="rtl"] .bed-top-left { align-items: flex-end; }
-  [dir="rtl"] .tag-row { flex-direction: row-reverse; }
-  [dir="rtl"] .flag-strip { flex-direction: row-reverse; }
-  [dir="rtl"] .modal-foot { flex-direction: row-reverse; }
-  [dir="rtl"] .overflow-menu { right: auto; left: 8px; }
-  [dir="rtl"] .bed-actions { flex-direction: row-reverse; }
-  [dir="rtl"] .acuity-seg { border-right: none; border-left: 1px solid var(--line-soft); }
-  [dir="rtl"] .acuity-seg:last-child { border-left: none; }
-  [dir="rtl"] .history-entry { border-left: none; border-right: 3px solid var(--line); padding: 6px 10px 6px 6px; border-radius: var(--r-sm) 0 0 var(--r-sm); }
-  [dir="rtl"] .admit-row { text-align: right; }
-  [dir="rtl"] .feed-item { flex-direction: row-reverse; }
-  [dir="rtl"] .feed-header { flex-direction: row-reverse; }
-  [dir="rtl"] #activityFeedBtn { right: auto; left: 16px; }
-  [dir="rtl"] #onCallBar { flex-direction: row-reverse; }
-  [dir="rtl"] #onCallEditBtn { margin-left: 0; margin-right: auto; }
-  [dir="rtl"] .hod-ward-row { flex-direction: row-reverse; }
-  [dir="rtl"] select {
-    background-position: left 10px center;
-    padding-right: 10px; padding-left: 30px;
-  }
-  [dir="rtl"] .modal-close { margin-left: 0; margin-right: auto; }
-
   /* ── Dark mode vars ────────────────────────────────────────── */
   /* Applied by: (a) OS dark preference when no manual override,
                  (b) html[data-theme="dark"] manual toggle          */
@@ -893,7 +866,7 @@
   #onCallBar::-webkit-scrollbar { display: none; }
   .oncall-label { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.06em; color: rgba(255,255,255,0.35); margin-right: 2px; }
   .oncall-name  { color: rgba(255,255,255,0.9); font-weight: 600; }
-  .oncall-bleep { color: var(--accent); font-weight: 700; margin-left: 3px; font-family: monospace; }
+  .oncall-ward  { color: rgba(255,255,255,0.5); font-size: 0.68rem; margin-left: 2px; }
   .oncall-empty { color: rgba(255,255,255,0.3); font-style: italic; }
   #onCallEditBtn {
     margin-left: auto; flex-shrink: 0; font-size: 0.68rem;
