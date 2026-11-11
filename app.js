@@ -1407,8 +1407,27 @@
 
     html += '<div class="field"><label>Current situation</label><div class="value">'+(displaySituation?escapeHtml(displaySituation):'<span class="empty-val">Not recorded</span>')+'</div></div>';
     html += '<div class="field"><label>Plan</label><div class="value">'+(displayPlan?escapeHtml(displayPlan):'<span class="empty-val">Not recorded</span>')+'</div></div>';
-    if(patient.general) html += '<div class="field"><label>Notes</label><div class="value" style="font-size:0.8rem;">'+escapeHtml(patient.general)+'</div></div>';
-    if(patient.labs)    html += '<div class="field"><label>Labs / investigations</label><div class="value" style="font-size:0.8rem;font-family:monospace;">'+escapeHtml(patient.labs)+'</div></div>';
+    if(patient.medication) html += '<div class="field"><label>Medications</label><div class="value" style="font-size:0.8rem;">'+escapeHtml(patient.medication)+'</div></div>';
+    if(patient.general)    html += '<div class="field"><label>Notes</label><div class="value" style="font-size:0.8rem;">'+escapeHtml(patient.general)+'</div></div>';
+    if(patient.labs)       html += '<div class="field"><label>Labs</label><div class="value" style="font-size:0.8rem;font-family:monospace;">'+escapeHtml(patient.labs)+'</div></div>';
+    // Weight/BMI
+    if(patient.weight || patient.bmi){
+      var wLine = [];
+      if(patient.weight) wLine.push("Wt: "+patient.weight+"kg");
+      if(patient.bmi)    wLine.push("BMI: "+patient.bmi.split(" ")[0]);
+      html += '<div class="field"><label>Weight / BMI</label><div class="value" style="font-size:0.8rem;">'+escapeHtml(wLine.join(" · "))+'</div></div>';
+    }
+    // Postnatal baby details
+    if(patient.type === "postnatal"){
+      var babyParts = [];
+      if(patient.babyWeight)   babyParts.push("BW: "+patient.babyWeight+"g");
+      if(patient.apgar)        babyParts.push("APGAR: "+patient.apgar);
+      if(patient.babyLocation) babyParts.push(patient.babyLocation);
+      if(patient.feeding)      babyParts.push("Feeding: "+patient.feeding);
+      if(babyParts.length) html += '<div class="field"><label>Baby</label><div class="value" style="font-size:0.8rem;">'+escapeHtml(babyParts.join(" · "))+'</div></div>';
+    }
+    // Birth plan
+    if(patient.birthPlan) html += '<div class="field"><label>Birth plan</label><div class="value" style="font-size:0.8rem;color:var(--purple);">'+escapeHtml(patient.birthPlan)+'</div></div>';
     
     var chk = patient.checklist || {};
     html += '<div class="checklist-display">' +
@@ -1622,10 +1641,33 @@
       };
     }
     setVal("f_fetal", patient ? patient.fetal : "");
-    setVal("f_modeDelivery", patient ? patient.modeDelivery : "");
-    setVal("f_dayPostDelivery", patient ? patient.dayPostDelivery : "");
-    setVal("f_baby", patient ? patient.baby : "");
-    setVal("f_vte", patient ? patient.vte : "");
+    setVal("f_modeDelivery",   patient ? patient.modeDelivery   : "");
+    setVal("f_dayPostDelivery",patient ? patient.dayPostDelivery: "");
+    setVal("f_baby",           patient ? patient.baby           : "");
+    setVal("f_vte",            patient ? patient.vte            : "");
+    // New baby fields
+    var bwEl = document.getElementById("f_babyWeight");
+    var apEl = document.getElementById("f_apgar");
+    var blEl = document.getElementById("f_babyLocation");
+    var fdEl = document.getElementById("f_feeding");
+    if(bwEl) bwEl.value = patient && patient.babyWeight ? patient.babyWeight : "";
+    if(apEl) apEl.value = patient && patient.apgar      ? patient.apgar      : "";
+    if(blEl) blEl.value = patient && patient.babyLocation ? patient.babyLocation : "";
+    if(fdEl) fdEl.value = patient && patient.feeding    ? patient.feeding    : "";
+    // Birth plan
+    setVal("f_birthPlan", patient ? patient.birthPlan : "");
+    // Weight / BMI
+    var wEl = document.getElementById("f_weight");
+    var hEl = document.getElementById("f_height");
+    var bEl = document.getElementById("f_bmi");
+    var dEl = document.getElementById("f_bmi_display");
+    if(wEl) wEl.value = patient && patient.weight ? patient.weight : "";
+    if(hEl) hEl.value = patient && patient.height ? patient.height : "";
+    var bmi = calcBMI(patient && patient.weight, patient && patient.height);
+    if(bEl) bEl.value = bmi ? bmi + bmiCategory(bmi) : "";
+    if(dEl) dEl.textContent = bmi || "";
+    // Medication
+    setVal("f_medication", patient ? patient.medication : "");
     setVal("f_procedure", patient ? patient.procedure : "");
     setVal("f_drains", patient ? patient.drains : "");
     setVal("f_mobilisation", patient ? patient.mobilisation : "");
@@ -1681,10 +1723,19 @@
         edd: (document.getElementById("f_edd")||{}).value || "",
         indication: getVal("f_indication"),
         fetal: getVal("f_fetal"),
-        modeDelivery: getVal("f_modeDelivery"),
-        dayPostDelivery: getVal("f_dayPostDelivery"),
-        baby: getVal("f_baby"),
-        vte: getVal("f_vte"),
+        modeDelivery:   getVal("f_modeDelivery"),
+        dayPostDelivery:getVal("f_dayPostDelivery"),
+        baby:           getVal("f_baby"),
+        vte:            getVal("f_vte"),
+        babyWeight:     (document.getElementById("f_babyWeight")||{}).value||"",
+        apgar:          getVal("f_apgar"),
+        babyLocation:   (document.getElementById("f_babyLocation")||{}).value||"",
+        feeding:        (document.getElementById("f_feeding")||{}).value||"",
+        birthPlan:      getVal("f_birthPlan"),
+        weight:         (document.getElementById("f_weight")||{}).value||"",
+        height:         (document.getElementById("f_height")||{}).value||"",
+        bmi:            (document.getElementById("f_bmi")||{}).value||"",
+        medication:     getVal("f_medication"),
         procedure: getVal("f_procedure"),
         drains: getVal("f_drains"),
         mobilisation: getVal("f_mobilisation"),
@@ -2220,7 +2271,17 @@
       row("Unit / consultant", patient.unit) +
       row("Diagnosis / indication", patient.diagnosis) +
       (patient.type==="antenatal" ? row("Gestation", patient.gestation) + row("Indication", patient.indication) + row("Fetal monitoring", patient.fetal) : "") +
-      (patient.type==="postnatal" ? row("Mode of delivery", patient.modeDelivery) + row("Day post-delivery", patient.dayPostDelivery) + row("Baby", patient.baby) + row("VTE status", patient.vte) : "") +
+      (patient.type==="postnatal" ?
+        row("Mode of delivery", patient.modeDelivery) +
+        row("Day post-delivery", patient.dayPostDelivery) +
+        row("Baby weight / APGAR", (patient.babyWeight?patient.babyWeight+"g":"") + (patient.apgar?" · APGAR "+patient.apgar:"")) +
+        row("Baby location", patient.babyLocation) +
+        row("Feeding", patient.feeding) +
+        row("Baby / paediatric notes", patient.baby) +
+        row("VTE prophylaxis", patient.vte) : "") +
+      (patient.weight ? row("Weight / BMI", patient.weight+"kg"+(patient.bmi?" · BMI "+patient.bmi:"")) : "") +
+      (patient.medication ? row("Medications", patient.medication) : "") +
+      (patient.birthPlan  ? row("Birth plan", patient.birthPlan)   : "") +
       (patient.type==="gynae"     ? row("Procedure", patient.procedure) + row("Drains", patient.drains) + row("Mobilisation", patient.mobilisation) : "") +
       row("Final situation", situation) +
       row("Discharge plan", plan) +
@@ -2356,6 +2417,137 @@
     openHodStats();
   };
 
+
+  /* ============================================================
+     FEATURE: WEIGHT / BMI AUTO-CALC
+  ============================================================ */
+  function calcBMI(weightKg, heightCm){
+    if(!weightKg || !heightCm) return "";
+    var bmi = weightKg / Math.pow(heightCm/100, 2);
+    return bmi.toFixed(1);
+  }
+  function bmiCategory(bmi){
+    var b = parseFloat(bmi);
+    if(isNaN(b)) return "";
+    if(b < 18.5) return " (Underweight)";
+    if(b < 25)   return " (Normal)";
+    if(b < 30)   return " (Overweight)";
+    if(b < 35)   return " (Obese I)";
+    if(b < 40)   return " (Obese II)";
+    return " (Obese III)";
+  }
+  function wireBMICalc(){
+    var wEl = document.getElementById("f_weight");
+    var hEl = document.getElementById("f_height");
+    var bEl = document.getElementById("f_bmi");
+    var dEl = document.getElementById("f_bmi_display");
+    function update(){
+      var w = parseFloat((wEl||{}).value);
+      var h = parseFloat((hEl||{}).value);
+      var bmi = calcBMI(w, h);
+      if(bEl) bEl.value = bmi ? bmi + bmiCategory(bmi) : "";
+      if(dEl) dEl.textContent = bmi ? bmi : "";
+    }
+    if(wEl) wEl.addEventListener("input", update);
+    if(hEl) hEl.addEventListener("input", update);
+  }
+  wireBMICalc();
+
+  /* ============================================================
+     FEATURE: WARD ROUND TIMER
+  ============================================================ */
+  var _roundStart = null;
+  var _roundInterval = null;
+
+  function formatDuration(ms){
+    var totalSec = Math.floor(ms/1000);
+    var mins = Math.floor(totalSec/60);
+    var secs = totalSec % 60;
+    return (mins < 10 ? "0" : "") + mins + ":" + (secs < 10 ? "0" : "") + secs;
+  }
+
+  var roundTimerBtn = document.getElementById("roundTimerBtn");
+  if(roundTimerBtn){
+    roundTimerBtn.onclick = function(){
+      if(!_roundStart){
+        // Start
+        _roundStart = Date.now();
+        roundTimerBtn.classList.add("running");
+        _roundInterval = setInterval(function(){
+          var elapsed = Date.now() - _roundStart;
+          roundTimerBtn.textContent = "⏱ Round — " + formatDuration(elapsed);
+        }, 1000);
+        // Log to activity feed
+        hodLog("progress", "Ward round started", currentWard().name);
+        saveState();
+        showToast("⏱ Round timer started");
+      } else {
+        // Stop
+        var elapsed = Date.now() - _roundStart;
+        clearInterval(_roundInterval);
+        _roundInterval = null;
+        var dur = formatDuration(elapsed);
+        _roundStart = null;
+        roundTimerBtn.classList.remove("running");
+        roundTimerBtn.textContent = "⏱ Start round";
+        hodLog("progress", "Ward round completed — duration: " + dur, currentWard().name);
+        saveState();
+        showToast("✓ Round complete — " + dur);
+      }
+    };
+  }
+
+  /* ============================================================
+     FEATURE: PRINT ON-CALL ROSTER
+  ============================================================ */
+  function printOnCallRoster(){
+    var staff = state.onCallStaff || [];
+    var date  = new Date().toLocaleDateString([], {weekday:"long", day:"2-digit", month:"long", year:"numeric"});
+    var time  = new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
+
+    var rows = staff.filter(function(s){ return s.name && s.name.trim(); }).map(function(s){
+      return '<tr style="border-bottom:1px solid #eee;">'+
+        '<td style="padding:10px 12px;font-weight:700;font-size:11pt;">'+escapeHtml(s.role||"—")+'</td>'+
+        '<td style="padding:10px 12px;font-size:11pt;">'+escapeHtml(s.name||"—")+'</td>'+
+        '<td style="padding:10px 12px;font-size:11pt;color:#0d7a68;">'+escapeHtml(s.ward||"—")+'</td>'+
+      '</tr>';
+    }).join("");
+
+    if(!rows){
+      showToast("No on-call staff set — tap ✏️ Edit first");
+      return;
+    }
+
+    var html = '<html><head><title>On-call Roster</title><style>'+
+      'body{font-family:Arial,sans-serif;padding:28px 32px;color:#111;}'+
+      'h1{font-size:16pt;margin:0 0 4px;}'+
+      '.meta{font-size:9pt;color:#555;margin-bottom:20px;}'+
+      'table{width:100%;border-collapse:collapse;border:1px solid #ddd;}'+
+      'th{text-align:left;padding:8px 12px;font-size:9pt;text-transform:uppercase;'+
+         'letter-spacing:0.05em;color:#555;background:#f4f6f8;border-bottom:2px solid #222;}'+
+      '.footer{margin-top:16px;font-size:8pt;color:#888;border-top:1px solid #ddd;padding-top:8px;}'+
+      '@media print{button{display:none!important;}}'+
+      '</style></head><body>'+
+      '<h1>📞 On-call Roster</h1>'+
+      '<div class="meta">'+escapeHtml(state.appTitle||"Ward Board")+' &nbsp;·&nbsp; '+date+' &nbsp;·&nbsp; Printed at '+time+'</div>'+
+      '<table><thead><tr>'+
+        '<th style="width:30%">Role</th>'+
+        '<th style="width:35%">Name / Initials</th>'+
+        '<th style="width:35%">Ward / Rooms</th>'+
+      '</tr></thead><tbody>'+rows+'</tbody></table>'+
+      '<div class="footer">Ward Board v1.2 · CONFIDENTIAL — For internal use only · Do not leave unattended</div>'+
+      '</body></html>';
+
+    var win = window.open("","_blank","width=600,height=500");
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    setTimeout(function(){ win.print(); }, 300);
+    document.getElementById("overflowMenu").style.display = "none";
+  }
+
+  var printOnCallBtn = document.getElementById("printOnCallBtn");
+  if(printOnCallBtn) printOnCallBtn.onclick = printOnCallRoster;
 
   /* ============================================================
      FEATURE: WARD DELETE (Lead panel)

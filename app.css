@@ -711,6 +711,20 @@
   .bed-card.empty:hover .bed-num { color: var(--accent); }
   .bed-card.empty:hover .empty-hint { color: var(--accent); }
 
+  /* ── Ward round timer ──────────────────────────────────────── */
+  .btn-round-timer {
+    font-size: 0.72rem; font-weight: 600; padding: 5px 11px;
+    border-radius: var(--r-sm); border: 1px solid var(--line);
+    background: var(--paper); color: var(--ink-soft); cursor: pointer;
+    transition: all 0.12s; white-space: nowrap; font-family: inherit;
+  }
+  .btn-round-timer:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-round-timer.running {
+    background: var(--accent-soft); color: var(--accent);
+    border-color: var(--accent); font-variant-numeric: tabular-nums;
+  }
+  .btn-round-timer.running::before { content: "🟢 "; }
+
   /* ── Compact view toggle ───────────────────────────────────── */
   .view-toggle { display: flex; border: 1px solid var(--line); border-radius: var(--r-sm); overflow: hidden; }
   .view-btn { padding: 5px 10px; font-size: 0.72rem; font-weight: 600; background: none; color: var(--ink-soft); border: none; border-radius: 0; cursor: pointer; transition: background 0.1s; }

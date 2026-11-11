@@ -37,6 +37,7 @@
         <button class="overflow-item btn-notif" id="notifHeaderBtn">🔔 Notifications</button>
         <button class="overflow-item" id="darkModeBtn">🌙 Dark mode</button>
         <div class="overflow-divider"></div>
+        <button class="overflow-item" id="printOnCallBtn">📞 Print on-call roster</button>
         <button class="overflow-item" onclick="document.getElementById('shortcutsOverlay').classList.add('show');document.getElementById('overflowMenu').style.display='none';">⌨️ Keyboard shortcuts</button>
         <div class="overflow-status" id="cloudStatus">☁️ Connecting…</div>
       </div>
@@ -114,6 +115,7 @@
       <button class="view-btn active" id="viewFull" title="Full view">▤ Full</button>
       <button class="view-btn" id="viewCompact" title="Compact view">▦ Compact</button>
     </div>
+    <button class="btn-round-timer" id="roundTimerBtn" title="Ward round timer">⏱ Start round</button>
   </div>
   <div class="filter-row">
     <select id="unitFilter">
@@ -218,6 +220,7 @@
           <div class="form-field"><label>Indication</label><input type="text" id="f_indication" placeholder="e.g. reduced movements"></div>
         </div>
         <div class="form-field"><label>Fetal monitoring</label><textarea id="f_fetal" placeholder="e.g. CTG reactive"></textarea></div>
+        <div class="form-field"><label>Birth plan / patient preferences</label><textarea id="f_birthPlan" placeholder="e.g. Epidural requested · Partner present · Cultural preferences"></textarea></div>
       </div>
 
       <div id="fieldsPostnatal" style="display:none;">
@@ -226,8 +229,36 @@
           <div class="form-field"><label>Mode of delivery</label><input type="text" id="f_modeDelivery" placeholder="e.g. SVD, LSCS"></div>
           <div class="form-field"><label>Day post-delivery</label><input type="text" id="f_dayPostDelivery" placeholder="e.g. Day 1"></div>
         </div>
-        <div class="form-field"><label>Baby / feeding</label><textarea id="f_baby" placeholder="e.g. Baby well"></textarea></div>
-        <div class="form-field"><label>VTE prophylaxis</label><input type="text" id="f_vte" placeholder="e.g. LMWH given"></div>
+        <div class="form-row">
+          <div class="form-field"><label>Baby birth weight (g)</label><input type="number" id="f_babyWeight" placeholder="e.g. 3200" min="300" max="6000"></div>
+          <div class="form-field"><label>APGAR (1 min / 5 min)</label><input type="text" id="f_apgar" placeholder="e.g. 8/9"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-field">
+            <label>Baby location</label>
+            <select id="f_babyLocation">
+              <option value="">—</option>
+              <option value="With mother">With mother</option>
+              <option value="NICU">NICU</option>
+              <option value="SCU / SCBU">SCU / SCBU</option>
+              <option value="Transitional care">Transitional care</option>
+              <option value="Transferred out">Transferred out</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label>Feeding</label>
+            <select id="f_feeding">
+              <option value="">—</option>
+              <option value="Breastfeeding">Breastfeeding</option>
+              <option value="Formula">Formula</option>
+              <option value="Mixed">Mixed</option>
+              <option value="NG tube">NG tube</option>
+              <option value="Not yet established">Not yet established</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-field"><label>Baby / paediatric notes</label><textarea id="f_baby" placeholder="e.g. Paed review done, jaundice monitoring"></textarea></div>
+        <div class="form-field"><label>VTE prophylaxis</label><input type="text" id="f_vte" placeholder="e.g. LMWH given, TED stockings"></div>
       </div>
 
       <div id="fieldsGynae" style="display:none;">
@@ -240,6 +271,18 @@
         <div class="form-field"><label>Lab results</label><textarea id="f_labs" placeholder="e.g. Hb 10.2"></textarea></div>
       </div>
 
+      <div class="section-divider">Admission measurements</div>
+      <div class="form-row" style="margin-top:10px;">
+        <div class="form-field"><label>Weight (kg)</label><input type="number" id="f_weight" placeholder="e.g. 72" min="30" max="300" step="0.1"></div>
+        <div class="form-field"><label>Height (cm)</label><input type="number" id="f_height" placeholder="e.g. 165" min="100" max="220"></div>
+        <div class="form-field"><label>BMI <span id="f_bmi_display" style="color:var(--accent);font-weight:700;"></span></label><input type="text" id="f_bmi" placeholder="Auto-calculated" readonly style="background:var(--paper)!important;color:var(--ink-soft)!important;"></div>
+      </div>
+      <div class="section-divider">Current medications</div>
+      <div class="form-field" style="margin-top:10px;">
+        <label>Medications (abbreviated — no full drug charts)</label>
+        <textarea id="f_medication" placeholder="e.g. Labetalol 200mg BD · MgSO4 · LMWH" rows="2"></textarea>
+        <div style="font-size:0.7rem;color:var(--ink-mute);margin-top:3px;">Key medications relevant to ward round only — refer to drug chart for full details</div>
+      </div>
       <div class="section-divider">Alerts & Flags</div>
       <div class="form-field" style="margin-top:10px;">
         <label>⚠️ Allergy / medication alert (shows as red banner on card)</label>
