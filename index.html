@@ -197,7 +197,7 @@
 
       <div class="form-field">
         <label>Diagnosis / reason for admission</label>
-        <textarea id="f_diagnosis"></textarea>
+        <input type="text" id="f_diagnosis" placeholder="Type or select…" list="diagnosisList" autocomplete="off" style="width:100%;">
       </div>
       <div class="form-field">
         <label>Current situation</label>
@@ -208,7 +208,11 @@
         <div class="section-divider">Antenatal details</div>
         <div class="form-row" style="margin-top:10px;">
           <div class="form-field"><label>Gestation</label><input type="text" id="f_gestation" placeholder="e.g. 34+2 weeks"></div>
-          <div class="form-field"><label>EDD (Expected Delivery Date)</label><input type="date" id="f_edd"></div>
+          <div class="form-field">
+            <label>EDD (Expected Delivery Date)</label>
+            <input type="date" id="f_edd">
+            <div id="f_edd_preview" style="font-size:0.72rem;color:var(--accent);font-weight:600;margin-top:3px;"></div>
+          </div>
         </div>
         <div class="form-row">
           <div class="form-field"><label>Indication</label><input type="text" id="f_indication" placeholder="e.g. reduced movements"></div>
@@ -300,6 +304,10 @@
       </div>
       <div class="form-field"><label>Current situation</label><textarea id="p_situation"></textarea></div>
       <div class="form-field"><label>Plan</label><textarea id="p_plan"></textarea></div>
+      <div class="form-field">
+        <label>Labs / investigations (optional — adds to trend)</label>
+        <input type="text" id="p_labs" placeholder="e.g. Hb 9.8 · WBC 11.2 · Plt 180">
+      </div>
       <div class="form-field">
         <label>Next review time</label>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
@@ -714,6 +722,91 @@
     <div style="height:16px;"></div>
   </div>
 </div>
+
+<!-- Diagnosis autocomplete list -->
+<datalist id="diagnosisList">
+  <!-- Obstetric -->
+  <option value="Pre-eclampsia">
+  <option value="Severe pre-eclampsia">
+  <option value="Gestational hypertension">
+  <option value="HELLP syndrome">
+  <option value="Eclampsia">
+  <option value="Gestational diabetes (GDM)">
+  <option value="Pre-existing diabetes in pregnancy">
+  <option value="Placenta praevia">
+  <option value="Placental abruption">
+  <option value="Antepartum haemorrhage (APH)">
+  <option value="Postpartum haemorrhage (PPH)">
+  <option value="PPROM — preterm prelabour rupture of membranes">
+  <option value="PROM — prelabour rupture of membranes">
+  <option value="Preterm labour">
+  <option value="Induction of labour (IOL)">
+  <option value="Prolonged labour">
+  <option value="Failure to progress">
+  <option value="Fetal distress">
+  <option value="Reduced fetal movements">
+  <option value="Intrauterine growth restriction (IUGR)">
+  <option value="Small for gestational age (SGA)">
+  <option value="Large for gestational age (LGA)">
+  <option value="Oligohydramnios">
+  <option value="Polyhydramnios">
+  <option value="Multiple pregnancy — twins">
+  <option value="Multiple pregnancy — triplets">
+  <option value="Malpresentation — breech">
+  <option value="Malpresentation — transverse">
+  <option value="Cord prolapse">
+  <option value="Shoulder dystocia">
+  <option value="Obstetric cholestasis">
+  <option value="Hyperemesis gravidarum">
+  <option value="Anaemia in pregnancy">
+  <option value="Thromboembolism / DVT">
+  <option value="Pulmonary embolism">
+  <option value="Urinary tract infection (UTI)">
+  <option value="Pyelonephritis">
+  <option value="Chorioamnionitis">
+  <option value="Group B Streptococcus (GBS)">
+  <option value="Thyroid disorder in pregnancy">
+  <!-- Postnatal -->
+  <option value="Normal vaginal delivery (NVD)">
+  <option value="Instrumental delivery — ventouse">
+  <option value="Instrumental delivery — forceps">
+  <option value="Emergency LSCS">
+  <option value="Elective LSCS">
+  <option value="Wound infection — LSCS">
+  <option value="Wound dehiscence">
+  <option value="Postnatal anaemia">
+  <option value="Postnatal depression">
+  <option value="Mastitis">
+  <option value="Retained products of conception (RPOC)">
+  <option value="Endometritis">
+  <!-- Gynaecology -->
+  <option value="Ectopic pregnancy">
+  <option value="Miscarriage — threatened">
+  <option value="Miscarriage — inevitable">
+  <option value="Miscarriage — incomplete">
+  <option value="Miscarriage — missed">
+  <option value="Molar pregnancy">
+  <option value="Ovarian cyst">
+  <option value="Ovarian torsion">
+  <option value="Pelvic inflammatory disease (PID)">
+  <option value="Endometriosis">
+  <option value="Fibroids — uterine leiomyoma">
+  <option value="Abnormal uterine bleeding">
+  <option value="Menorrhagia">
+  <option value="Cervical cancer">
+  <option value="Endometrial cancer">
+  <option value="Ovarian cancer">
+  <option value="Vulval conditions">
+  <option value="Bartholin cyst / abscess">
+  <option value="Urinary incontinence">
+  <option value="Pelvic organ prolapse">
+  <option value="Laparoscopy — diagnostic">
+  <option value="Laparoscopy — operative">
+  <option value="Hysterectomy — abdominal">
+  <option value="Hysterectomy — laparoscopic">
+  <option value="Myomectomy">
+  <option value="D&amp;C / ERPC">
+</datalist>
 
 <div id="summaryPrintView"></div>
 <div id="fullPrintView"></div>

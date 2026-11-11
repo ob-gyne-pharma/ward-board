@@ -90,6 +90,33 @@
 
   function bedKey(room, bed){ return room + bed; }
   function nowISO(){ return new Date().toISOString(); }
+
+  /* Calculate gestation string from EDD — e.g. "34+2 weeks" */
+  function calcGestationFromEDD(eddStr){
+    if(!eddStr) return "";
+    var edd = new Date(eddStr);
+    if(isNaN(edd.getTime())) return "";
+    // EDD = LMP + 280 days, so LMP = EDD - 280 days
+    var lmp = new Date(edd.getTime() - 280 * 86400000);
+    var today = new Date();
+    today.setHours(0,0,0,0);
+    var daysPregnant = Math.floor((today - lmp) / 86400000);
+    if(daysPregnant < 0 || daysPregnant > 300) return "";
+    var weeks = Math.floor(daysPregnant / 7);
+    var days  = daysPregnant % 7;
+    return weeks + "+" + days + " weeks";
+  }
+
+  /* Length of stay string from admission ISO timestamp */
+  function calcLengthOfStay(admittedIso){
+    if(!admittedIso) return "";
+    var admitted = new Date(admittedIso);
+    if(isNaN(admitted.getTime())) return "";
+    var days = Math.floor((Date.now() - admitted.getTime()) / 86400000);
+    if(days === 0) return "Admitted today";
+    if(days === 1) return "Day 1";
+    return "Day " + days;
+  }
   function fmtTime(iso){ return new Date(iso).toLocaleString([], {weekday:'short', hour:'2-digit', minute:'2-digit', day:'2-digit', month:'short'}); }
   function fmtTimeShort(iso){ return new Date(iso).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); }
   function fmtDateShort(iso){ return new Date(iso).toLocaleDateString([], {day:'2-digit', month:'short'}); }
@@ -1222,6 +1249,56 @@
     }
   }
 
+  /* Parse a lab string like "Hb 10.2 · WBC 12.1" into key-value pairs */
+  function parseLabString(str){
+    if(!str) return {};
+    var result = {};
+    // Match patterns like "Hb 10.2", "WBC 12.1", "Plt 180", "Cr 85"
+    var matches = str.matchAll(/([A-Za-z][A-Za-z0-9]*)\s*:?\s*(\d+\.?\d*)/g);
+    for(var m of matches){ result[m[1].toUpperCase()] = parseFloat(m[2]); }
+    return result;
+  }
+
+  /* Build a trend object: {Hb: [10.2, 9.8, 9.1], WBC: [12, 11]} from history */
+  function buildLabTrend(patient){
+    if(!patient || !patient.history || patient.history.length < 2) return {};
+    var trend = {};
+    // Oldest first
+    patient.history.forEach(function(entry){
+      if(!entry.labs && !entry.situation) return;
+      var parsed = parseLabString(entry.labs || "");
+      Object.keys(parsed).forEach(function(key){
+        if(!trend[key]) trend[key] = [];
+        trend[key].push(parsed[key]);
+      });
+    });
+    // Also include current patient labs
+    if(patient.labs){
+      var cur = parseLabString(patient.labs);
+      Object.keys(cur).forEach(function(key){
+        if(!trend[key]) trend[key] = [];
+        // Only add if different from last value
+        var last = trend[key][trend[key].length-1];
+        if(last !== cur[key]) trend[key].push(cur[key]);
+      });
+    }
+    // Keep only keys with at least 2 values (a trend)
+    Object.keys(trend).forEach(function(k){ if(trend[k].length < 2) delete trend[k]; });
+    return trend;
+  }
+
+  /* Format a trend array as "10.2 → 9.8 → 9.1 ↓" */
+  function formatTrend(values){
+    if(!values || values.length < 2) return "";
+    var arrow = "";
+    var last  = values[values.length-1];
+    var prev  = values[values.length-2];
+    if(last < prev)      arrow = ' <span style="color:var(--red);">↓</span>';
+    else if(last > prev) arrow = ' <span style="color:var(--accent);">↑</span>';
+    else                 arrow = ' <span style="color:var(--ink-mute);">→</span>';
+    return values.join(" → ") + arrow;
+  }
+
   function renderBedCard(room, bed, patient){
     var card = document.createElement("div");
     card.className = "bed-card " + (patient ? "occupied acuity-" + patient.acuity : "empty");
@@ -1242,6 +1319,7 @@
 
     // Occupied card — tags LEFT-aligned under bed number
     var overdueBadge = isOverdue(patient) ? '<span class="overdue-badge">⏰ Overdue</span>' : '';
+    var losTag = patient.admitted ? '<span class="tag" style="background:var(--amber-soft);color:var(--amber);">'+calcLengthOfStay(patient.admitted)+'</span>' : '';
     top.innerHTML =
       '<div class="bed-top-left">' +
         '<div class="bed-num">Bed '+room+bed+'</div>' +
@@ -1249,6 +1327,7 @@
           '<span class="tag acuity-'+patient.acuity+'">'+(ACUITY_LABEL[patient.acuity]||"Stable")+'</span>' +
           '<span class="tag type-'+patient.type+'">'+(TYPE_LABEL[patient.type]||"Antenatal")+'</span>' +
           (patient.unit?'<span class="tag unit-tag">'+escapeHtml(patient.unit)+'</span>':'') +
+          losTag +
         '</div>' +
         (overdueBadge||'') +
       '</div>';
@@ -1312,7 +1391,8 @@
     // EDD + Gestation for antenatal patients
     if(patient.type === "antenatal" && (patient.gestation || patient.edd)){
       var gestParts = [];
-      if(patient.gestation) gestParts.push(escapeHtml(patient.gestation));
+      var gestDisplay = patient.gestation || calcGestationFromEDD(patient.edd);
+      if(gestDisplay) gestParts.push(escapeHtml(gestDisplay));
       if(patient.edd){
         var eddD = new Date(patient.edd);
         if(!isNaN(eddD.getTime())){
@@ -1342,7 +1422,9 @@
     var updateTimeIso = lastEntry ? lastEntry.time : (patient.lastUpdated || patient.admitted);
 
     html += '<div class="admit-row">' +
-      '<span>Admitted: '+fmtDateShort(patient.admitted)+' at '+fmtTimeShort(patient.admitted)+' by <strong>'+admittedByStr+'</strong></span>' +
+      '<span>Admitted: '+fmtDateShort(patient.admitted)+' at '+fmtTimeShort(patient.admitted)+' by <strong>'+admittedByStr+'</strong>' +
+        (patient.admitted ? ' &nbsp;·&nbsp; <strong style="color:var(--amber);">'+calcLengthOfStay(patient.admitted)+'</strong>' : '') +
+      '</span>' +
       '<span>Last updated: <strong>'+updatedByStr+'</strong> at '+fmtTimeShort(updateTimeIso)+'</span>' +
       '</div>';
 
@@ -1360,13 +1442,30 @@
         histList.style.display = open ? "none" : "flex";
         toggle.textContent = (open ? "▸ Show history (" : "▾ Hide history (") + patient.history.length + ")";
       };
+      // Build lab trend across all history entries
+      var labTrend = buildLabTrend(patient);
+      var trendKeys = Object.keys(labTrend);
+      if(trendKeys.length){
+        var trendDiv = document.createElement("div");
+        trendDiv.style.cssText = "background:var(--paper);border:1px solid var(--line-soft);border-radius:var(--r-sm);padding:7px 10px;margin-bottom:8px;font-size:0.74rem;";
+        trendDiv.innerHTML = '<div style="font-size:0.62rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--ink-mute);margin-bottom:5px;">📈 Lab trends</div>' +
+          trendKeys.map(function(k){
+            return '<div style="display:flex;gap:6px;align-items:baseline;margin-bottom:3px;">'+
+              '<span style="font-weight:700;color:var(--ink-soft);min-width:36px;">'+escapeHtml(k)+'</span>'+
+              '<span style="font-family:monospace;">'+formatTrend(labTrend[k])+'</span>'+
+            '</div>';
+          }).join("");
+        historyList.appendChild(trendDiv);
+      }
+
       patient.history.slice().reverse().forEach(function(entry, idxRev){
         var realIdx = patient.history.length - 1 - idxRev;
         var he = document.createElement("div");
         he.className = "history-entry";
         he.innerHTML = '<div class="h-time"><span>'+fmtTime(entry.time)+' · '+(ACUITY_LABEL[entry.acuity]||"Stable")+' · <strong>'+escapeHtml(entry.updatedBy||"Staff")+'</strong></span><span class="del" data-idx="'+realIdx+'">Delete</span></div>'+
           (entry.situation?'<div class="h-row"><span class="h-label">Situation:</span> '+escapeHtml(entry.situation)+'</div>':'')+
-          (entry.plan?'<div class="h-row"><span class="h-label">Plan:</span> '+escapeHtml(entry.plan)+'</div>':'');
+          (entry.plan?'<div class="h-row"><span class="h-label">Plan:</span> '+escapeHtml(entry.plan)+'</div>':'')+
+          (entry.labs?'<div class="h-row"><span class="h-label">Labs:</span> <span style="font-family:monospace;font-size:0.78rem;">'+escapeHtml(entry.labs)+'</span></div>':'');
         he.querySelector(".del").onclick = function(){
           showConfirm("Delete entry", "Delete this history entry? This cannot be undone.", "Delete", "btn-danger-outline", function(){ patient.history.splice(realIdx,1); saveState(); render(); });
         };
@@ -1511,7 +1610,17 @@
     setVal("f_indication", patient ? patient.indication : "");
     // EDD — stored as YYYY-MM-DD
     var eddEl = document.getElementById("f_edd");
-    if(eddEl) eddEl.value = patient && patient.edd ? patient.edd : "";
+    if(eddEl){
+      eddEl.value = patient && patient.edd ? patient.edd : "";
+      eddEl.onchange = function(){
+        var calc = calcGestationFromEDD(eddEl.value);
+        var gestEl = document.getElementById("f_gestation");
+        if(calc && gestEl && !gestEl.value) gestEl.value = calc;
+        // Show preview
+        var prev = document.getElementById("f_edd_preview");
+        if(prev) prev.textContent = calc ? "→ Gestation: " + calc : "";
+      };
+    }
     setVal("f_fetal", patient ? patient.fetal : "");
     setVal("f_modeDelivery", patient ? patient.modeDelivery : "");
     setVal("f_dayPostDelivery", patient ? patient.dayPostDelivery : "");
@@ -1629,6 +1738,8 @@
     var pn = document.getElementById("p_nextReview");
     if(ps) ps.value = lastEntry ? lastEntry.situation : patient.situation || "";
     if(pp) pp.value = lastEntry ? lastEntry.plan : patient.plan || "";
+    var plabs = document.getElementById("p_labs");
+    if(plabs) plabs.value = "";
     // Load nextReview into time picker
     var prv = parseReviewISO((lastEntry && lastEntry.nextReview) ? lastEntry.nextReview : patient.nextReview || "");
     var pNR = document.getElementById("p_nextReview");
@@ -1666,11 +1777,13 @@
       var pp = document.getElementById("p_plan");
       var pn = document.getElementById("p_nextReview");
 
+      var pLabs = document.getElementById("p_labs");
       var entry = {
         time: nowISO(),
         acuity: progressAcuity,
         situation: ps ? ps.value.trim() : "",
         plan: pp ? pp.value.trim() : "",
+        labs: pLabs ? pLabs.value.trim() : "",
         nextReview: buildReviewISO((document.getElementById("p_nextReview")||{}).value||"", (document.getElementById("p_nextReviewDay")||{}).value||"today"),
         updatedBy: staffName
       };
@@ -2921,9 +3034,8 @@
      OVERDUE: re-check every 60 seconds and re-render if needed
   ============================================================ */
   setInterval(function(){
-    var w = currentWard(); if(!w||!w.rooms) return;
-    var anyOverdue = Object.values(w.rooms).some(function(p){ return p && isOverdue(p); });
-    if(anyOverdue) render();
+    // Re-render every minute to update overdue badges, length of stay, and gestation
+    render();
   }, 60000);
 
 
