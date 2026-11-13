@@ -955,6 +955,17 @@
     letter-spacing: 0.02em;
   }
 
+  /* ── Auth login modal ──────────────────────────────────────── */
+  #authOverlay .modal {
+    border: 1px solid rgba(255,255,255,0.08);
+    box-shadow: 0 32px 80px rgba(0,0,0,0.5);
+  }
+  #authOverlay .modal-head { background: var(--header-bg); border-radius: var(--r-xl) var(--r-xl) 0 0; }
+  #authOverlay .modal-head h2 { color: #fff; }
+  #authOverlay .modal-head .mark { background: linear-gradient(135deg, var(--accent) 0%, #0a9f88 100%); }
+  #authOverlay .modal-foot { border-radius: 0 0 var(--r-xl) var(--r-xl); padding: 16px 20px 20px; }
+  #authOverlay input { font-size: 16px; }
+
   /* Lead Panel */
   .btn-hod{color:#e8c84a !important; border-color:rgba(232,200,74,0.35) !important;}
   .btn-hod:hover{background:rgba(232,200,74,0.12) !important;}
