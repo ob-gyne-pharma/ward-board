@@ -644,6 +644,193 @@
   })();
 
   /* ============================================================
+     FIREBASE AUTH UI
+  ============================================================ */
+  var _authMode = "signin"; // "signin" | "register"
+
+  /* Called by firebase-sync.js when auth state is logged out */
+  window.showLoginModal = function(){
+    var overlay = document.getElementById("authOverlay");
+    if(overlay) overlay.classList.add("show");
+    // Pre-fill email if previously used
+    var savedEmail = localStorage.getItem("wb_last_email");
+    var emailEl = document.getElementById("authEmail");
+    if(emailEl && savedEmail) emailEl.value = savedEmail;
+    clearAuthError();
+  };
+
+  /* Called by firebase-sync.js when user logs in successfully */
+  window.onAuthReady = function(user){
+    var overlay = document.getElementById("authOverlay");
+    if(overlay) overlay.classList.remove("show");
+    // Sync display name into app's staff name system
+    var displayName = user.displayName || user.email.split("@")[0];
+    setStaffName(displayName);
+    var btn = document.getElementById("staffNameBtn");
+    if(btn) btn.textContent = "👤 " + displayName;
+    // Save email for next login
+    localStorage.setItem("wb_last_email", user.email);
+    // Request FCM token if notifications granted
+    if(Notification.permission === "granted" && window.requestFCMToken){
+      window.requestFCMToken().catch(function(e){ console.warn("FCM token error:", e); });
+    }
+    console.log("[Auth] Signed in as:", displayName);
+  };
+
+  function clearAuthError(){
+    var err = document.getElementById("authError");
+    if(err){ err.style.display="none"; err.textContent=""; }
+  }
+  function showAuthError(msg){
+    var err = document.getElementById("authError");
+    if(err){ err.textContent=msg; err.style.display="block"; }
+  }
+  function setAuthMode(mode){
+    _authMode = mode;
+    var title   = document.getElementById("authTitle");
+    var submit  = document.getElementById("authSubmitBtn");
+    var toggle  = document.getElementById("authToggleBtn");
+    var nameF   = document.getElementById("authNameField");
+    var forgot  = document.getElementById("authForgotWrap");
+    var passEl  = document.getElementById("authPassword");
+    if(mode === "register"){
+      if(title)  title.textContent  = "Create account";
+      if(submit) submit.textContent = "Create account";
+      if(toggle) toggle.textContent = "Already have an account? Sign in";
+      if(nameF)  nameF.style.display = "flex";
+      if(forgot) forgot.style.display = "none";
+      if(passEl) passEl.placeholder = "Choose a password (min 6 chars)";
+      passEl && (passEl.autocomplete = "new-password");
+    } else {
+      if(title)  title.textContent  = "Sign in to Ward Board";
+      if(submit) submit.textContent = "Sign in";
+      if(toggle) toggle.textContent = "Don't have an account? Register";
+      if(nameF)  nameF.style.display = "none";
+      if(forgot) forgot.style.display = "block";
+      if(passEl) passEl.placeholder = "••••••••";
+      passEl && (passEl.autocomplete = "current-password");
+    }
+    clearAuthError();
+  }
+
+  document.getElementById("authToggleBtn").onclick = function(){
+    setAuthMode(_authMode === "signin" ? "register" : "signin");
+  };
+
+  document.getElementById("authSubmitBtn").onclick = function(){
+    var email    = (document.getElementById("authEmail").value||"").trim();
+    var password = (document.getElementById("authPassword").value||"").trim();
+    var name     = (document.getElementById("authName")||{}).value ? document.getElementById("authName").value.trim() : "";
+    clearAuthError();
+
+    if(!email || !password){
+      showAuthError("Please enter your email and password.");
+      return;
+    }
+    if(_authMode === "register" && !name){
+      showAuthError("Please enter your name or initials.");
+      return;
+    }
+    if(_authMode === "register" && password.length < 6){
+      showAuthError("Password must be at least 6 characters.");
+      return;
+    }
+
+    var btn = document.getElementById("authSubmitBtn");
+    btn.textContent = "Please wait…";
+    btn.disabled = true;
+
+    var action = _authMode === "register"
+      ? window.firebaseAuth.register(email, password, name)
+      : window.firebaseAuth.signIn(email, password);
+
+    action.then(function(){
+      btn.textContent = _authMode === "signin" ? "Sign in" : "Create account";
+      btn.disabled = false;
+    }).catch(function(err){
+      btn.textContent = _authMode === "signin" ? "Sign in" : "Create account";
+      btn.disabled = false;
+      var msg = err.code || err.message || "Unknown error";
+      if(msg.includes("user-not-found") || msg.includes("wrong-password") || msg.includes("invalid-credential")){
+        showAuthError("Incorrect email or password. Please try again.");
+      } else if(msg.includes("email-already-in-use")){
+        showAuthError("An account with this email already exists. Sign in instead.");
+        setAuthMode("signin");
+      } else if(msg.includes("weak-password")){
+        showAuthError("Password is too weak — use at least 6 characters.");
+      } else if(msg.includes("invalid-email")){
+        showAuthError("Please enter a valid email address.");
+      } else if(msg.includes("network-request-failed")){
+        showAuthError("Network error — check your connection and try again.");
+      } else {
+        showAuthError("Error: " + msg);
+      }
+    });
+  };
+
+  // Allow Enter key on password field
+  document.getElementById("authPassword").addEventListener("keydown", function(e){
+    if(e.key === "Enter") document.getElementById("authSubmitBtn").click();
+  });
+  document.getElementById("authEmail").addEventListener("keydown", function(e){
+    if(e.key === "Enter") document.getElementById("authPassword").focus();
+  });
+
+  // Forgot password
+  document.getElementById("authForgotBtn").onclick = function(){
+    var email = (document.getElementById("authEmail").value||"").trim();
+    if(!email){ showAuthError("Enter your email address first."); return; }
+    if(!window.firebaseAuth){ showAuthError("Auth not ready."); return; }
+    // sendPasswordResetEmail is imported in firebase-sync.js
+    if(window.firebaseAuth.resetPassword){
+      window.firebaseAuth.resetPassword(email).then(function(){
+        showAuthError("✓ Reset email sent — check your inbox.");
+        document.getElementById("authError").style.background = "var(--accent-soft)";
+        document.getElementById("authError").style.color = "var(--accent)";
+      }).catch(function(e){ showAuthError("Error: " + (e.message||e.code)); });
+    } else {
+      showAuthError("Password reset is available after setup. Contact your Lead.");
+    }
+  };
+
+  // Profile / account button
+  var authProfileBtn = document.getElementById("authProfileBtn");
+  if(authProfileBtn){
+    authProfileBtn.onclick = function(){
+      document.getElementById("overflowMenu").style.display = "none";
+      openSetNameModal(); // Reuse set name modal to update display name
+    };
+  }
+
+  // Sign out button
+  var authSignOutBtn = document.getElementById("authSignOutBtn");
+  if(authSignOutBtn){
+    authSignOutBtn.onclick = function(){
+      document.getElementById("overflowMenu").style.display = "none";
+      showConfirm("Sign out", "Sign out of Ward Board on this device?", "Sign out", "btn-danger-outline", function(){
+        if(window.firebaseAuth) window.firebaseAuth.signOut().then(function(){
+          var btn = document.getElementById("staffNameBtn");
+          if(btn) btn.textContent = "👤 Sign in";
+        });
+      });
+    };
+  }
+
+  // Also update display name in Firebase Auth when staff name changes
+  var _origConfirmSetName = document.getElementById("confirmSetName");
+  if(_origConfirmSetName){
+    var _origOnclick = _origConfirmSetName.onclick;
+    _origConfirmSetName.onclick = function(){
+      if(_origOnclick) _origOnclick.call(this);
+      var clean = (document.getElementById("setNameInput").value||"").trim();
+      if(clean && window.firebaseAuth && window.firebaseAuth.updateDisplayName){
+        window.firebaseAuth.updateDisplayName(clean)
+          .catch(function(e){ console.warn("Display name update:", e); });
+      }
+    };
+  }
+
+  /* ============================================================
      DARK MODE TOGGLE
   ============================================================ */
   var THEME_KEY = "wb_theme";
@@ -1668,6 +1855,8 @@
     if(dEl) dEl.textContent = bmi || "";
     // Medication
     setVal("f_medication", patient ? patient.medication : "");
+    // Wire BMI auto-calc now that fields exist in DOM
+    wireBMICalc();
     setVal("f_procedure", patient ? patient.procedure : "");
     setVal("f_drains", patient ? patient.drains : "");
     setVal("f_mobilisation", patient ? patient.mobilisation : "");
@@ -2451,7 +2640,8 @@
     if(wEl) wEl.addEventListener("input", update);
     if(hEl) hEl.addEventListener("input", update);
   }
-  wireBMICalc();
+  /* wireBMICalc() is called inside openPatientModal instead of at startup
+     because the fields don't exist in the DOM until the modal opens */
 
   /* ============================================================
      FEATURE: WARD ROUND TIMER
