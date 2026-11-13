@@ -2,7 +2,7 @@
    Service Worker: offline cache + background sync
 */
 
-const CACHE_NAME = 'ward-board-v1.1';
+const CACHE_NAME = 'ward-board-v2.0';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -49,10 +49,15 @@ self.addEventListener('activate', function(event) {
 self.addEventListener('fetch', function(event) {
   var url = event.request.url;
 
-  // Always go to network for Firebase (real-time data)
+  // Always go to network for Firebase services — never cache these
   if (url.includes('firebasedatabase.app') ||
       url.includes('firebaseio.com') ||
-      url.includes('googleapis.com/identitytoolkit')) {
+      url.includes('googleapis.com/identitytoolkit') ||
+      url.includes('securetoken.googleapis.com') ||
+      url.includes('firebaseauth.googleapis.com') ||
+      url.includes('fcmregistrations.googleapis.com') ||
+      url.includes('firebase.googleapis.com') ||
+      url.includes('gstatic.com/firebasejs')) {
     return; // let it fall through to network
   }
 
