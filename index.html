@@ -25,7 +25,7 @@
     <span id="clock"></span>
     <!-- Cloud status dot -->
     <span id="cloudDot" title="Sync status" style="width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,0.25);display:inline-block;flex-shrink:0;transition:background 0.4s;"></span>
-    <button class="btn-ghost btn-small" id="staffNameBtn">👤 Set name</button>
+    <button class="btn-ghost btn-small" id="staffNameBtn" style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">👤 Sign in</button>
     <button class="btn-ghost btn-small btn-hod" id="hodBtn">🔑 Lead</button>
     <!-- Overflow menu -->
     <div class="overflow-menu-wrap" id="overflowWrap">
@@ -38,6 +38,10 @@
         <button class="overflow-item" id="darkModeBtn">🌙 Dark mode</button>
         <div class="overflow-divider"></div>
         <button class="overflow-item" id="printOnCallBtn">📞 Print on-call roster</button>
+        <div class="overflow-divider"></div>
+        <button class="overflow-item" id="authProfileBtn">👤 My account</button>
+        <button class="overflow-item" id="authSignOutBtn" style="color:var(--red);">↩ Sign out</button>
+        <div class="overflow-divider"></div>
         <button class="overflow-item" onclick="document.getElementById('shortcutsOverlay').classList.add('show');document.getElementById('overflowMenu').style.display='none';">⌨️ Keyboard shortcuts</button>
         <div class="overflow-status" id="cloudStatus">☁️ Connecting…</div>
       </div>
@@ -368,6 +372,47 @@
     <div class="modal-foot">
       <button class="btn-outline" id="cancelProgressModal">Cancel</button>
       <button class="btn-primary" id="saveProgressModal">Save Update</button>
+    </div>
+  </div>
+</div>
+
+<!-- Auth Login / Register Modal -->
+<div class="overlay" id="authOverlay" style="background:rgba(10,18,26,0.92);backdrop-filter:blur(6px);">
+  <div class="modal" style="max-width:400px;margin-top:60px;">
+    <div class="modal-swipe-bar"></div>
+    <div class="modal-head" style="border-bottom:none;padding-bottom:8px;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div class="mark" style="width:36px;height:36px;border-radius:10px;font-size:18px;">🩺</div>
+        <div>
+          <h2 style="margin:0;font-size:1.1rem;" id="authTitle">Sign in to Ward Board</h2>
+          <div style="font-size:0.72rem;color:var(--ink-mute);margin-top:2px;">Secure clinical workspace</div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-body" style="gap:10px;">
+      <div id="authError" style="display:none;padding:9px 12px;border-radius:var(--r-sm);background:var(--red-soft);color:var(--red);font-size:0.82rem;font-weight:600;"></div>
+      <div class="form-field" id="authNameField" style="display:none;">
+        <label>Your name / initials (shown on updates)</label>
+        <input type="text" id="authName" placeholder="e.g. Dr Ahmed" maxlength="40" autocomplete="name">
+      </div>
+      <div class="form-field">
+        <label>Email address</label>
+        <input type="email" id="authEmail" placeholder="your@email.com" autocomplete="email">
+      </div>
+      <div class="form-field">
+        <label>Password</label>
+        <input type="password" id="authPassword" placeholder="••••••••" autocomplete="current-password" minlength="6">
+      </div>
+      <div class="confidentiality-notice" style="border-radius:var(--r-sm);border:1px solid var(--amber-mid);">
+        🔒 Your login is personal — do not share credentials. All actions are logged with your identity.
+      </div>
+    </div>
+    <div class="modal-foot" style="flex-direction:column;gap:8px;align-items:stretch;">
+      <button class="btn-primary" id="authSubmitBtn" style="width:100%;padding:12px;">Sign in</button>
+      <button class="btn-outline" id="authToggleBtn" style="width:100%;font-size:0.8rem;">Don't have an account? Register</button>
+      <div id="authForgotWrap" style="text-align:center;">
+        <button id="authForgotBtn" style="background:none;border:none;color:var(--ink-mute);font-size:0.75rem;cursor:pointer;font-family:inherit;">Forgot password?</button>
+      </div>
     </div>
   </div>
 </div>
