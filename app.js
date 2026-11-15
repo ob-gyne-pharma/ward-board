@@ -246,6 +246,7 @@
     renderHodBedCounts();
     renderHodConsultantList();
     renderLeadWardDeleteList();
+    renderStaffMgmt();
     renderHodHistWardFilter();
     renderHodHistory();
     ov.classList.add("show");
@@ -648,6 +649,167 @@
   ============================================================ */
   var _authMode = "signin"; // "signin" | "register"
 
+  /* ============================================================
+     PENDING APPROVAL SCREEN
+  ============================================================ */
+  window.showPendingScreen = function(user){
+    // Hide login, show pending
+    var loginOv = document.getElementById("authOverlay");
+    var pendOv  = document.getElementById("pendingOverlay");
+    if(loginOv) loginOv.classList.remove("show");
+    if(pendOv)  pendOv.classList.add("show");
+    // Show user info
+    var info = document.getElementById("pendingUserInfo");
+    if(info) info.innerHTML =
+      '<strong>'+escapeHtml(user.displayName||"—")+'</strong><br>'+
+      escapeHtml(user.email||"");
+  };
+
+  document.getElementById("pendingSignOutBtn").onclick = function(){
+    if(window.firebaseAuth) window.firebaseAuth.signOut().then(function(){
+      document.getElementById("pendingOverlay").classList.remove("show");
+    });
+  };
+  document.getElementById("pendingRefreshBtn").onclick = function(){
+    // Force a page reload to re-trigger auth state check
+    location.reload();
+  };
+
+  /* ============================================================
+     STAFF MANAGEMENT (Lead panel)
+  ============================================================ */
+  var STATUS_LABELS = {
+    pending:  { label:"⏳ Pending",   color:"var(--amber)",  bg:"var(--amber-soft)"  },
+    approved: { label:"✓ Approved",  color:"var(--accent)",  bg:"var(--accent-soft)" },
+    inactive: { label:"✕ Inactive",  color:"var(--red)",     bg:"var(--red-soft)"    },
+    rejected: { label:"✕ Rejected",  color:"var(--red)",     bg:"var(--red-soft)"    },
+  };
+
+  function renderStaffMgmt(staffData){
+    var container = document.getElementById("staffMgmtList");
+    var badge     = document.getElementById("pendingBadge");
+    if(!container) return;
+
+    var entries = Object.values(staffData||{});
+    if(!entries.length){
+      container.innerHTML = '<div style="font-size:0.82rem;color:var(--ink-mute);padding:8px 0;">No staff registered yet.</div>';
+      if(badge) badge.style.display = "none";
+      return;
+    }
+
+    // Sort: pending first, then approved, then inactive/rejected
+    var order = {pending:0, approved:1, inactive:2, rejected:3};
+    entries.sort(function(a,b){ return (order[a.status]||9)-(order[b.status]||9); });
+
+    var pendingCount = entries.filter(function(e){ return e.status==="pending"; }).length;
+    if(badge){
+      badge.textContent = pendingCount > 0 ? pendingCount+" awaiting" : "";
+      badge.style.display = pendingCount > 0 ? "inline" : "none";
+    }
+
+    container.innerHTML = "";
+    entries.forEach(function(s){
+      var st = STATUS_LABELS[s.status] || STATUS_LABELS.pending;
+      var row = document.createElement("div");
+      row.style.cssText = "border:1px solid var(--line);border-radius:var(--r-md);padding:10px 12px;";
+
+      var nameHtml = '<div style="font-weight:600;font-size:0.86rem;">'+escapeHtml(s.name||"Unknown")+
+        (s.status==="inactive"?' <span style="font-size:0.68rem;color:var(--red);font-weight:400;">(inactive)</span>':'')+
+        '</div>'+
+        '<div style="font-size:0.72rem;color:var(--ink-mute);">'+escapeHtml(s.email||"")+'</div>'+
+        (s.requestedAt?'<div style="font-size:0.68rem;color:var(--ink-mute);">Registered: '+fmtDateShort(s.requestedAt)+'</div>':'')+
+        (s.approvedBy?'<div style="font-size:0.68rem;color:var(--accent);">Approved by: '+escapeHtml(s.approvedBy)+'</div>':'')+
+        (s.deactivatedBy?'<div style="font-size:0.68rem;color:var(--red);">Removed by: '+escapeHtml(s.deactivatedBy)+'</div>':'');
+
+      var statusBadge = '<span style="font-size:0.65rem;font-weight:700;padding:2px 7px;border-radius:20px;background:'+st.bg+';color:'+st.color+';">'+st.label+'</span>';
+
+      var btns = '<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">';
+      if(s.status === "pending"){
+        btns += '<button class="btn-primary btn-small" data-action="approve" data-uid="'+escapeHtml(s.uid)+'">✓ Approve</button>';
+        btns += '<button class="btn-danger-outline btn-small" data-action="reject" data-uid="'+escapeHtml(s.uid)+'">✕ Reject</button>';
+      } else if(s.status === "approved"){
+        btns += '<button class="btn-danger-outline btn-small" data-action="deactivate" data-uid="'+escapeHtml(s.uid)+'" data-name="'+escapeHtml(s.name||"")+'">Remove access</button>';
+      } else if(s.status === "inactive" || s.status === "rejected"){
+        btns += '<button class="btn-outline btn-small" data-action="reactivate" data-uid="'+escapeHtml(s.uid)+'">↺ Reactivate</button>';
+      }
+      btns += '</div>';
+
+      row.innerHTML =
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">'+
+          '<div>'+nameHtml+'</div>'+
+          statusBadge+
+        '</div>'+btns;
+
+      // Wire buttons
+      row.querySelectorAll("button[data-action]").forEach(function(btn){
+        btn.onclick = function(){
+          var action = btn.dataset.action;
+          var uid    = btn.dataset.uid;
+          var name   = btn.dataset.name || "this staff member";
+          if(!window.firebaseAuth) return;
+
+          if(action === "approve"){
+            btn.textContent = "Approving…"; btn.disabled = true;
+            window.firebaseAuth.approveStaff(uid).then(function(){
+              showToast("✓ "+escapeHtml(s.name)+" approved");
+              loadStaffList();
+            }).catch(function(e){ showToast("Error: "+e.message); btn.disabled=false; });
+
+          } else if(action === "reject"){
+            showConfirm("Reject request", "Reject access request from "+name+"?", "Reject", "btn-danger-outline", function(){
+              window.firebaseAuth.rejectStaff(uid).then(function(){
+                showToast("Request rejected");
+                loadStaffList();
+              });
+            });
+
+          } else if(action === "deactivate"){
+            showConfirm(
+              "Remove access",
+              "Remove "+name+"'s access to Ward Board?\n\nTheir historical records will show their name as inactive. They will not be able to sign in until reactivated.",
+              "Remove access",
+              "btn-danger-outline",
+              function(){
+                window.firebaseAuth.deactivateStaff(uid, name).then(function(){
+                  showToast("✓ "+escapeHtml(name)+" removed");
+                  loadStaffList();
+                  // Log to activity feed
+                  hodLog("edit", "Staff access removed: "+name, "Admin");
+                  saveState();
+                });
+              }
+            );
+
+          } else if(action === "reactivate"){
+            window.firebaseAuth.approveStaff(uid).then(function(){
+              showToast("✓ "+escapeHtml(s.name)+" reactivated");
+              loadStaffList();
+            });
+          }
+        };
+      });
+
+      container.appendChild(row);
+    });
+  }
+
+  function loadStaffList(){
+    var container = document.getElementById("staffMgmtList");
+    if(!container) return;
+    if(!window.firebaseAuth || !window.firebaseAuth.loadAllStaff){
+      container.innerHTML = '<div style="font-size:0.82rem;color:var(--ink-mute);">Sign in to manage staff.</div>';
+      return;
+    }
+    container.innerHTML = '<div style="font-size:0.82rem;color:var(--ink-mute);padding:8px 0;">Loading…</div>';
+    window.firebaseAuth.loadAllStaff().then(function(data){
+      renderStaffMgmt(data);
+    }).catch(function(e){
+      container.innerHTML = '<div style="font-size:0.82rem;color:var(--red);">Error loading staff: '+escapeHtml(e.message||"")+'</div>';
+    });
+  }
+
+  document.getElementById("refreshStaffBtn").onclick = loadStaffList;
+
   /* Called by firebase-sync.js when auth state is logged out */
   window.showLoginModal = function(){
     var overlay = document.getElementById("authOverlay");
@@ -676,6 +838,194 @@
     }
     console.log("[Auth] Signed in as:", displayName);
   };
+
+  /* ── Pending approval screen ─────────────────────────────── */
+  window.showPendingScreen = function(user){
+    // Hide login modal
+    var loginOv = document.getElementById("authOverlay");
+    if(loginOv) loginOv.classList.remove("show");
+    // Show pending overlay
+    var pendOv = document.getElementById("pendingOverlay");
+    if(pendOv) pendOv.classList.add("show");
+    // Fill user info
+    var info = document.getElementById("pendingUserInfo");
+    if(info) info.innerHTML =
+      '<div style="margin-bottom:4px;"><strong>Name:</strong> '+escapeHtml(user.displayName||"—")+'</div>'+
+      '<div style="margin-bottom:4px;"><strong>Email:</strong> '+escapeHtml(user.email)+'</div>'+
+      '<div style="font-size:0.75rem;color:var(--ink-mute);">Share this email with the Ward Lead to request approval.</div>';
+  };
+
+  var pendingSignOutBtn = document.getElementById("pendingSignOutBtn");
+  if(pendingSignOutBtn){
+    pendingSignOutBtn.onclick = function(){
+      if(window._approvalPoll) clearInterval(window._approvalPoll);
+      if(window.firebaseAuth) window.firebaseAuth.signOut();
+      var pendOv = document.getElementById("pendingOverlay");
+      if(pendOv) pendOv.classList.remove("show");
+    };
+  }
+
+  /* ── Google sign-in button ───────────────────────────────── */
+  var googleBtn = document.getElementById("googleSignInBtn");
+  if(googleBtn){
+    googleBtn.onclick = function(){
+      clearAuthError();
+      googleBtn.textContent = "Signing in…";
+      googleBtn.disabled = true;
+      if(window.firebaseAuth && window.firebaseAuth.signInWithGoogle){
+        window.firebaseAuth.signInWithGoogle()
+          .then(function(){
+            googleBtn.innerHTML = 'Continue with Google';
+            googleBtn.disabled = false;
+          })
+          .catch(function(err){
+            googleBtn.innerHTML = 'Continue with Google';
+            googleBtn.disabled = false;
+            if(err.code !== "auth/popup-closed-by-user"){
+              showAuthError("Google sign-in failed: " + (err.message||err.code));
+            }
+          });
+      }
+    };
+  }
+
+  /* ── Staff management (Lead panel) ──────────────────────── */
+  function renderStaffMgmt(){
+    var container = document.getElementById("staffMgmtList");
+    var badge     = document.getElementById("pendingBadge");
+    if(!container || !window.firebaseAuth) return;
+
+    container.innerHTML = '<div style="font-size:0.8rem;color:var(--ink-mute);padding:8px 0;">Loading staff…</div>';
+
+    window.firebaseAuth.loadAllStaff().then(function(allStaff){
+      container.innerHTML = "";
+      var entries = Object.values(allStaff);
+      if(!entries.length){
+        container.innerHTML = '<div style="font-size:0.8rem;color:var(--ink-mute);">No staff registered yet.</div>';
+        return;
+      }
+
+      // Sort: pending first, then approved, then inactive/rejected
+      var order = {pending:0, approved:1, inactive:2, rejected:3};
+      entries.sort(function(a,b){ return (order[a.status]||9)-(order[b.status]||9); });
+
+      var pendingCount = entries.filter(function(s){ return s.status==="pending"; }).length;
+      if(badge){
+        badge.textContent = pendingCount + " pending";
+        badge.style.display = pendingCount ? "inline" : "none";
+      }
+
+      entries.forEach(function(s){
+        var row = document.createElement("div");
+        row.style.cssText = "border:1px solid var(--line);border-radius:var(--r-md);padding:10px 12px;display:flex;flex-direction:column;gap:6px;";
+
+        // Status colour
+        var statusColor = s.status==="approved" ? "var(--accent)" :
+                          s.status==="pending"  ? "var(--amber)"  :
+                          s.status==="inactive" ? "var(--ink-mute)" : "var(--red)";
+        var statusLabel = {approved:"✓ Active", pending:"⏳ Pending", inactive:"✗ Inactive", rejected:"✗ Rejected"}[s.status] || s.status;
+
+        row.innerHTML =
+          '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;">'+
+            '<span style="font-weight:700;font-size:0.88rem;">'+escapeHtml(s.name||"Unknown")+'</span>'+
+            '<span style="font-size:0.68rem;font-weight:700;color:'+statusColor+';">'+statusLabel+'</span>'+
+          '</div>'+
+          '<div style="font-size:0.76rem;color:var(--ink-soft);">'+escapeHtml(s.email||"")+'</div>'+
+          (s.requestedAt ? '<div style="font-size:0.68rem;color:var(--ink-mute);">Requested: '+fmtTime(s.requestedAt)+'</div>' : '')+
+          (s.approvedBy  ? '<div style="font-size:0.68rem;color:var(--ink-mute);">Approved by: '+escapeHtml(s.approvedBy)+'</div>' : '')+
+          (s.deactivatedAt ? '<div style="font-size:0.68rem;color:var(--ink-mute);">Deactivated: '+fmtTime(s.deactivatedAt)+' by '+escapeHtml(s.deactivatedBy||"Lead")+'</div>' : '');
+
+        // Action buttons
+        var actions = document.createElement("div");
+        actions.style.cssText = "display:flex;gap:6px;flex-wrap:wrap;margin-top:2px;";
+
+        if(s.status === "pending"){
+          var approveBtn = document.createElement("button");
+          approveBtn.className = "btn-primary btn-small";
+          approveBtn.textContent = "✓ Approve";
+          approveBtn.onclick = function(){
+            approveBtn.textContent = "Approving…"; approveBtn.disabled = true;
+            window.firebaseAuth.approveStaff(s.uid).then(function(){
+              showToast("✓ "+escapeHtml(s.name)+" approved");
+              renderStaffMgmt();
+            }).catch(function(e){ showToast("Error: "+e.message); });
+          };
+          var rejectBtn = document.createElement("button");
+          rejectBtn.className = "btn-danger-outline btn-small";
+          rejectBtn.textContent = "✗ Reject";
+          rejectBtn.onclick = function(){
+            showConfirm("Reject request", "Reject "+s.name+"'s access request? They will not be able to access the ward board.", "Reject", "btn-danger-outline", function(){
+              window.firebaseAuth.rejectStaff(s.uid).then(function(){
+                showToast("Request rejected");
+                renderStaffMgmt();
+              });
+            });
+          };
+          actions.appendChild(approveBtn);
+          actions.appendChild(rejectBtn);
+        } else if(s.status === "approved"){
+          // Don't allow deactivating yourself
+          var currentUID = window.firebaseAuth.getUID();
+          if(s.uid !== currentUID){
+            var deactBtn = document.createElement("button");
+            deactBtn.className = "btn-danger-outline btn-small";
+            deactBtn.textContent = "Deactivate (staff left)";
+            deactBtn.onclick = function(){
+              showConfirm(
+                "Deactivate "+s.name,
+                s.name+" will immediately lose access to the Ward Board. Their name on historical records will show as inactive. This cannot be self-reversed.",
+                "Deactivate", "btn-danger-outline",
+                function(){
+                  window.firebaseAuth.deactivateStaff(s.uid, s.name).then(function(){
+                    showToast("✓ "+s.name+" deactivated");
+                    renderStaffMgmt();
+                  });
+                }
+              );
+            };
+            actions.appendChild(deactBtn);
+          } else {
+            var youLabel = document.createElement("span");
+            youLabel.style.cssText = "font-size:0.72rem;color:var(--ink-mute);";
+            youLabel.textContent = "← This is you";
+            actions.appendChild(youLabel);
+          }
+        } else if(s.status === "inactive" || s.status === "rejected"){
+          var reactivateBtn = document.createElement("button");
+          reactivateBtn.className = "btn-outline btn-small";
+          reactivateBtn.textContent = "Re-activate";
+          reactivateBtn.onclick = function(){
+            window.firebaseAuth.approveStaff(s.uid).then(function(){
+              showToast("✓ "+s.name+" re-activated");
+              renderStaffMgmt();
+            });
+          };
+          actions.appendChild(reactivateBtn);
+        }
+
+        if(actions.children.length) row.appendChild(actions);
+        container.appendChild(row);
+      });
+    }).catch(function(err){
+      container.innerHTML = '<div style="font-size:0.8rem;color:var(--red);">Error loading staff: '+escapeHtml(err.message||"")+'</div>';
+    });
+  }
+
+  /* Watch for pending staff in real time — updates badge on Lead button */
+  setTimeout(function(){
+    if(window.firebaseAuth && window.firebaseAuth.watchPendingStaff){
+      window.firebaseAuth.watchPendingStaff(function(count){
+        var badge = document.getElementById("pendingBadge");
+        if(badge){
+          badge.textContent = count+" pending";
+          badge.style.display = count > 0 ? "inline" : "none";
+        }
+        // Also update Lead button to show notification
+        var hodBtn = document.getElementById("hodBtn");
+        if(hodBtn) hodBtn.textContent = count > 0 ? "🔑 Lead 🔴" : "🔑 Lead";
+      });
+    }
+  }, 3000); // wait for auth to initialise
 
   function clearAuthError(){
     var err = document.getElementById("authError");
@@ -712,6 +1062,21 @@
     }
     clearAuthError();
   }
+
+  // Google sign-in button
+  document.getElementById("googleSignInBtn").onclick = function(){
+    clearAuthError();
+    var btn = document.getElementById("googleSignInBtn");
+    btn.textContent = "Signing in…"; btn.disabled = true;
+    if(!window.firebaseAuth){ btn.textContent="Not ready"; btn.disabled=false; return; }
+    window.firebaseAuth.signInWithGoogle().catch(function(err){
+      btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg> Continue with Google';
+      btn.disabled = false;
+      if(err.code !== "auth/popup-closed-by-user"){
+        showAuthError("Google sign-in failed: " + (err.message||err.code));
+      }
+    });
+  };
 
   document.getElementById("authToggleBtn").onclick = function(){
     setAuthMode(_authMode === "signin" ? "register" : "signin");

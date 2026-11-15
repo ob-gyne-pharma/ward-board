@@ -955,6 +955,17 @@
     letter-spacing: 0.02em;
   }
 
+  /* ── Pending approval screen ───────────────────────────────── */
+  #pendingOverlay .modal {
+    border: 1px solid rgba(255,255,255,0.08);
+    box-shadow: 0 32px 80px rgba(0,0,0,0.5);
+    animation: pendingPulse 3s ease-in-out infinite;
+  }
+  @keyframes pendingPulse {
+    0%,100% { box-shadow: 0 32px 80px rgba(0,0,0,0.5); }
+    50%      { box-shadow: 0 32px 80px rgba(13,122,104,0.3); }
+  }
+
   /* ── Auth login modal ──────────────────────────────────────── */
   #authOverlay .modal {
     border: 1px solid rgba(255,255,255,0.08);
