@@ -999,3 +999,37 @@
   .hist-entry-type.discharge{background:var(--red-soft);color:var(--red);}
   .hist-entry-type.handover{background:var(--amber-soft);color:var(--amber);}
   .hist-empty{padding:24px;text-align:center;color:var(--ink-soft);font-size:0.85rem;}
+
+/* ══ SMART ADMIT / AI ADMISSION PANEL ══ */
+#smartAdmitToggleBtn:hover {
+  background: linear-gradient(135deg, rgba(13,122,104,0.28), rgba(13,122,104,0.14)) !important;
+}
+#smartAdmitText:focus {
+  outline: none;
+  border-color: rgba(13,122,104,0.5) !important;
+}
+#smartAdmitRunBtn:hover:not(:disabled) {
+  background: #0a9f88 !important;
+}
+#smartAdmitRunBtn:disabled {
+  opacity: 0.6;
+}
+
+/* ══ THEATRE LIST ══ */
+#theatreListBody input:focus {
+  outline: none;
+  border-color: rgba(13,122,104,0.5) !important;
+}
+
+/* ══ SIGN-OFF PIN INPUT ══ */
+#signoffPin:focus {
+  outline: none;
+  border-color: rgba(13,122,104,0.5) !important;
+  box-shadow: 0 0 0 3px rgba(13,122,104,0.15);
+}
+
+/* ══ QR MODAL ══ */
+#qrCodeContainer canvas,
+#qrCodeContainer img {
+  border-radius: 8px;
+}
