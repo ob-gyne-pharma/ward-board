@@ -37,6 +37,7 @@
 
     if(!Array.isArray(s.consultants)) s.consultants = [];
     if(!Array.isArray(s.onCallStaff)) s.onCallStaff = [];
+    if(!s.wardNotes || typeof s.wardNotes !== "object") s.wardNotes = {};
     s.wardOrder.forEach(function(id){
       var w = s.wards[id];
       if(!w.rooms || typeof w.rooms !== "object") w.rooms = {};
@@ -812,6 +813,9 @@
 
   /* Called by firebase-sync.js when auth state is logged out */
   window.showLoginModal = function(){
+    if(window._hideLoading) window._hideLoading();
+    var appContent = document.getElementById("appContent");
+    if(appContent) appContent.style.display = "none";
     var overlay = document.getElementById("authOverlay");
     if(overlay) overlay.classList.add("show");
     // Pre-fill email if previously used
@@ -822,9 +826,14 @@
   };
 
   /* Called by firebase-sync.js when user logs in successfully */
-  window.onAuthReady = function(user){
-    var overlay = document.getElementById("authOverlay");
-    if(overlay) overlay.classList.remove("show");
+  window.onAuthReady = function(user, data){
+    if(window._hideLoading) window._hideLoading();
+    var authOv = document.getElementById("authOverlay");
+    var pendOv = document.getElementById("pendingOverlay");
+    if(authOv) authOv.classList.remove("show");
+    if(pendOv) pendOv.classList.remove("show");
+    var appContent = document.getElementById("appContent");
+    if(appContent) appContent.style.display = "block";
     // Sync display name into app's staff name system
     var displayName = user.displayName || user.email.split("@")[0];
     setStaffName(displayName);
@@ -841,7 +850,9 @@
 
   /* ── Pending approval screen ─────────────────────────────── */
   window.showPendingScreen = function(user){
-    // Hide login modal
+    if(window._hideLoading) window._hideLoading();
+    var appContent = document.getElementById("appContent");
+    if(appContent) appContent.style.display = "none";
     var loginOv = document.getElementById("authOverlay");
     if(loginOv) loginOv.classList.remove("show");
     // Show pending overlay
@@ -866,7 +877,7 @@
   }
 
   /* ── Google sign-in button ───────────────────────────────── */
-  var googleBtn = document.getElementById("googleSignInBtn");
+  var googleBtn = document.getElementById("authGoogleBtn");
   if(googleBtn){
     googleBtn.onclick = function(){
       clearAuthError();
@@ -1064,9 +1075,9 @@
   }
 
   // Google sign-in button
-  document.getElementById("googleSignInBtn").onclick = function(){
+  document.getElementById("authGoogleBtn").onclick = function(){
     clearAuthError();
-    var btn = document.getElementById("googleSignInBtn");
+    var btn = document.getElementById("authGoogleBtn");
     btn.textContent = "Signing in…"; btn.disabled = true;
     if(!window.firebaseAuth){ btn.textContent="Not ready"; btn.disabled=false; return; }
     window.firebaseAuth.signInWithGoogle().catch(function(err){
@@ -1176,6 +1187,8 @@
         if(window.firebaseAuth) window.firebaseAuth.signOut().then(function(){
           var btn = document.getElementById("staffNameBtn");
           if(btn) btn.textContent = "👤 Sign in";
+          var appContent = document.getElementById("appContent");
+          if(appContent) appContent.style.display = "none";
         });
       });
     };
@@ -1977,7 +1990,23 @@
       if(patient.babyLocation) babyParts.push(patient.babyLocation);
       if(patient.feeding)      babyParts.push("Feeding: "+patient.feeding);
       if(babyParts.length) html += '<div class="field"><label>Baby</label><div class="value" style="font-size:0.8rem;">'+escapeHtml(babyParts.join(" · "))+'</div></div>';
+      if(patient.paedReview){
+        var prC = patient.paedReview==="Done" ? "var(--accent-soft);color:var(--accent)" :
+                  patient.paedReview==="Pending" ? "var(--amber-soft);color:var(--amber)" :
+                  "var(--line-soft);color:var(--ink-soft)";
+        html += '<div style="font-size:0.7rem;font-weight:700;padding:3px 9px;border-radius:20px;display:inline-block;margin-top:4px;background:'+prC+';">👶 Paed: '+escapeHtml(patient.paedReview)+'</div>';
+      }
     }
+    // Latest vitals from most recent history entry
+    var lastVitals = null;
+    if(patient.history){
+      for(var hi=patient.history.length-1; hi>=0; hi--){
+        if(patient.history[hi].vitals && Object.values(patient.history[hi].vitals).some(Boolean)){
+          lastVitals = patient.history[hi].vitals; break;
+        }
+      }
+    }
+    if(lastVitals){ var vStr=formatVitals(lastVitals); if(vStr) html += '<div class="field"><label>Latest obs</label><div class="value" style="font-size:0.78rem;font-family:monospace;">'+escapeHtml(vStr)+'</div></div>'; }
     // Birth plan
     if(patient.birthPlan) html += '<div class="field"><label>Birth plan</label><div class="value" style="font-size:0.8rem;color:var(--purple);">'+escapeHtml(patient.birthPlan)+'</div></div>';
     
@@ -2036,7 +2065,8 @@
         he.innerHTML = '<div class="h-time"><span>'+fmtTime(entry.time)+' · '+(ACUITY_LABEL[entry.acuity]||"Stable")+' · <strong>'+escapeHtml(entry.updatedBy||"Staff")+'</strong></span><span class="del" data-idx="'+realIdx+'">Delete</span></div>'+
           (entry.situation?'<div class="h-row"><span class="h-label">Situation:</span> '+escapeHtml(entry.situation)+'</div>':'')+
           (entry.plan?'<div class="h-row"><span class="h-label">Plan:</span> '+escapeHtml(entry.plan)+'</div>':'')+
-          (entry.labs?'<div class="h-row"><span class="h-label">Labs:</span> <span style="font-family:monospace;font-size:0.78rem;">'+escapeHtml(entry.labs)+'</span></div>':'');
+          (entry.labs?'<div class="h-row"><span class="h-label">Labs:</span> <span style="font-family:monospace;font-size:0.78rem;">'+escapeHtml(entry.labs)+'</span></div>':'')+
+          (entry.vitals && formatVitals(entry.vitals) ? '<div class="h-row"><span class="h-label">Obs:</span> <span style="font-family:monospace;font-size:0.78rem;">'+escapeHtml(formatVitals(entry.vitals))+'</span></div>' : '');
         he.querySelector(".del").onclick = function(){
           showConfirm("Delete entry", "Delete this history entry? This cannot be undone.", "Delete", "btn-danger-outline", function(){ patient.history.splice(realIdx,1); saveState(); render(); });
         };
@@ -2075,6 +2105,7 @@
       '<button class="overflow-item" id="moreTx_'+room+bed+'">🔀 Transfer</button>' +
       '<button class="overflow-item" id="moreShare_'+room+bed+'">📤 Share summary</button>' +
       '<button class="overflow-item" id="morePrint_'+room+bed+'">🖨️ Print card</button>' +
+      '<button class="overflow-item" id="moreQR_'+room+bed+'">📱 QR code for bed</button>' +
       '<div class="overflow-divider"></div>' +
       '<button class="overflow-item" style="color:var(--red);" id="moreDisch_'+room+bed+'">↩ Discharge</button>';
 
@@ -2102,11 +2133,13 @@
       var sBtn  = document.getElementById("moreShare_"+room+bed);
       var pBtn  = document.getElementById("morePrint_"+room+bed);
       var dBtn  = document.getElementById("moreDisch_"+room+bed);
+      var qBtn  = document.getElementById("moreQR_"+room+bed);
       if(eBtn) eBtn.onclick = function(){ moreMenu.style.display="none"; openPatientModal(room, bed, patient); };
       if(tBtn) tBtn.onclick = function(){ moreMenu.style.display="none"; openTransferModal(room, bed); };
       if(sBtn) sBtn.onclick = function(){ moreMenu.style.display="none"; sharePatientSummary(room, bed); };
       if(pBtn) pBtn.onclick = function(){ moreMenu.style.display="none"; printPatientCard(room, bed); };
       if(dBtn) dBtn.onclick = function(){ moreMenu.style.display="none"; openDischargeSummary(room, bed); };
+      if(qBtn) qBtn.onclick = function(){ moreMenu.style.display="none"; openQRModal(room, bed); };
     }, 0);
 
     moreWrap.appendChild(moreBtn);
@@ -2202,6 +2235,8 @@
     var apEl = document.getElementById("f_apgar");
     var blEl = document.getElementById("f_babyLocation");
     var fdEl = document.getElementById("f_feeding");
+    var prEl2 = document.getElementById("f_paedReview");
+    if(prEl2) prEl2.value = patient && patient.paedReview ? patient.paedReview : "";
     if(bwEl) bwEl.value = patient && patient.babyWeight ? patient.babyWeight : "";
     if(apEl) apEl.value = patient && patient.apgar      ? patient.apgar      : "";
     if(blEl) blEl.value = patient && patient.babyLocation ? patient.babyLocation : "";
@@ -2281,6 +2316,7 @@
         dayPostDelivery:getVal("f_dayPostDelivery"),
         baby:           getVal("f_baby"),
         vte:            getVal("f_vte"),
+        paedReview:     (document.getElementById("f_paedReview")||{}).value||"",
         babyWeight:     (document.getElementById("f_babyWeight")||{}).value||"",
         apgar:          getVal("f_apgar"),
         babyLocation:   (document.getElementById("f_babyLocation")||{}).value||"",
@@ -2345,6 +2381,7 @@
     if(pp) pp.value = lastEntry ? lastEntry.plan : patient.plan || "";
     var plabs = document.getElementById("p_labs");
     if(plabs) plabs.value = "";
+    clearVitals();
     // Load nextReview into time picker
     var prv = parseReviewISO((lastEntry && lastEntry.nextReview) ? lastEntry.nextReview : patient.nextReview || "");
     var pNR = document.getElementById("p_nextReview");
@@ -2389,6 +2426,7 @@
         situation: ps ? ps.value.trim() : "",
         plan: pp ? pp.value.trim() : "",
         labs: pLabs ? pLabs.value.trim() : "",
+        vitals: getVitals(),
         nextReview: buildReviewISO((document.getElementById("p_nextReview")||{}).value||"", (document.getElementById("p_nextReviewDay")||{}).value||"today"),
         updatedBy: staffName
       };
@@ -2595,6 +2633,7 @@
     checkEmptyWard();
     checkUrgentNotifications();
     renderOnCallBar();
+    renderWardNotesBar();
     updateFeedBadge();
   };
 
@@ -3209,7 +3248,7 @@
     var data = JSON.stringify({
       exportedAt: nowISO(),
       exportedBy: getStaffName()||"Lead",
-      appVersion: "v1.1",
+      appVersion: "v2.1",
       state: state
     }, null, 2);
     var blob = new Blob([data], {type:"application/json"});
@@ -3405,6 +3444,89 @@
       return;
     }
   });
+
+
+  /* ============================================================
+     FEATURE: VITAL SIGNS TRENDING
+  ============================================================ */
+  function getVitals(){
+    return {
+      bp:    (document.getElementById("p_bp")   ||{}).value||"",
+      pulse: (document.getElementById("p_pulse")||{}).value||"",
+      temp:  (document.getElementById("p_temp") ||{}).value||"",
+      spo2:  (document.getElementById("p_spo2") ||{}).value||"",
+      rr:    (document.getElementById("p_rr")   ||{}).value||""
+    };
+  }
+  function clearVitals(){
+    ["p_bp","p_pulse","p_temp","p_spo2","p_rr"].forEach(function(id){
+      var el = document.getElementById(id); if(el) el.value = "";
+    });
+  }
+  function formatVitals(v){
+    if(!v) return "";
+    var parts = [];
+    if(v.bp)    parts.push("BP "+v.bp);
+    if(v.pulse) parts.push("P "+v.pulse);
+    if(v.temp)  parts.push("T "+v.temp+"°");
+    if(v.spo2)  parts.push("SpO₂ "+v.spo2+"%");
+    if(v.rr)    parts.push("RR "+v.rr);
+    return parts.join(" · ");
+  }
+  function buildVitalsTrend(patient){
+    if(!patient||!patient.history||patient.history.length < 2) return {};
+    var trend = {};
+    var labels = {bp:"BP",pulse:"Pulse",temp:"Temp",spo2:"SpO₂",rr:"RR"};
+    patient.history.forEach(function(entry){
+      if(!entry.vitals) return;
+      Object.keys(labels).forEach(function(k){
+        if(!entry.vitals[k]) return;
+        if(!trend[k]) trend[k] = {label:labels[k], values:[]};
+        trend[k].values.push(entry.vitals[k]);
+      });
+    });
+    Object.keys(trend).forEach(function(k){ if(trend[k].values.length < 2) delete trend[k]; });
+    return trend;
+  }
+
+
+  /* ============================================================
+     FEATURE: WARD ROUND GROUP NOTES
+  ============================================================ */
+  function renderWardNotesBar(){
+    var bar    = document.getElementById("wardNotesBar");
+    var textEl = document.getElementById("wardNotesText");
+    var notes  = state.wardNotes && state.wardNotes[activeWardId];
+    if(bar) bar.style.display = (notes && notes.text) ? "flex" : "none";
+    if(textEl && notes) textEl.textContent = notes.text || "";
+  }
+  var _wne = document.getElementById("wardNotesEditBtn");
+  var _wnc = document.getElementById("wardNotesClearBtn");
+  var _wncl = document.getElementById("closeWardNotes");
+  var _wnca = document.getElementById("cancelWardNotes");
+  var _wns = document.getElementById("saveWardNotes");
+  if(_wne) _wne.onclick = function(){
+    var notes = state.wardNotes && state.wardNotes[activeWardId];
+    var inp = document.getElementById("wardNotesInput");
+    if(inp) inp.value = notes ? notes.text : "";
+    document.getElementById("wardNotesOverlay").classList.add("show");
+    setTimeout(function(){ if(inp) inp.focus(); }, 120);
+  };
+  if(_wnc) _wnc.onclick = function(){
+    if(!state.wardNotes) state.wardNotes = {};
+    state.wardNotes[activeWardId] = {text:"", updatedAt:nowISO(), by: getStaffName()||"Staff"};
+    saveState(); renderWardNotesBar();
+  };
+  if(_wncl) _wncl.onclick = function(){ document.getElementById("wardNotesOverlay").classList.remove("show"); };
+  if(_wnca) _wnca.onclick = function(){ document.getElementById("wardNotesOverlay").classList.remove("show"); };
+  if(_wns) _wns.onclick = function(){
+    var text = (document.getElementById("wardNotesInput").value||"").trim();
+    if(!state.wardNotes) state.wardNotes = {};
+    state.wardNotes[activeWardId] = {text:text, updatedAt:nowISO(), by: getStaffName()||"Staff"};
+    saveState(); renderWardNotesBar();
+    document.getElementById("wardNotesOverlay").classList.remove("show");
+    if(text && window.showToast) showToast("📋 Round notes saved");
+  };
 
   /* ============================================================
      FEATURE: SHARE PATIENT SUMMARY
@@ -3791,4 +3913,465 @@
   updateNotifStatus();
   render();
 
-})();
+  /* ============================================================
+     FEATURE 1 — SMART ADMIT (AI Admission Summary)
+     Calls Anthropic API, extracts structured fields from free text,
+     then pre-fills the Add Patient modal form.
+  ============================================================ */
+  (function(){
+    var toggleBtn = document.getElementById("smartAdmitToggleBtn");
+    var body      = document.getElementById("smartAdmitBody");
+    var chevron   = document.getElementById("smartAdmitChevron");
+    var runBtn    = document.getElementById("smartAdmitRunBtn");
+    var statusEl  = document.getElementById("smartAdmitStatus");
+    var resultEl  = document.getElementById("smartAdmitResult");
+    var textEl    = document.getElementById("smartAdmitText");
+
+    if(!toggleBtn) return;
+
+    toggleBtn.onclick = function(){
+      var open = body.style.display !== "none";
+      body.style.display = open ? "none" : "block";
+      chevron.style.transform = open ? "" : "rotate(180deg)";
+    };
+
+    runBtn.onclick = function(){
+      var note = (textEl.value || "").trim();
+      if(!note){ statusEl.textContent = "Please enter a clinical note first."; return; }
+
+      runBtn.disabled = true;
+      runBtn.textContent = "⏳ Thinking…";
+      statusEl.textContent = "";
+      resultEl.style.display = "none";
+
+      fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-6",
+          max_tokens: 800,
+          messages: [{
+            role: "user",
+            content: "Extract structured fields from this OB-Gyne clinical admission note. Reply ONLY with a valid JSON object, no markdown, no explanation.\n\nJSON shape:\n{\"type\":\"antenatal|postnatal|gynae\",\"acuity\":\"stable|review|urgent\",\"diagnosis\":\"...\",\"gestation\":\"...\",\"medication\":\"...\",\"situation\":\"...\",\"plan\":\"...\",\"flags\":[\"NBM\",\"THEATRE\",\"SCAN\",\"ISOLATION\"],\"age\":\"...\",\"allergy\":\"...\"}\n\nRules:\n- type: antenatal if pregnant/EDD/gestation/G.P., postnatal if post-delivery/day 1-5 baby, gynae otherwise\n- acuity: urgent if severe/eclampsia/emergency, review if needs monitoring, stable otherwise\n- flags: only include if clearly mentioned\n- gestation: format as \"34+2 weeks\" if mentioned\n- allergy: uppercase, leave blank if not mentioned\n- Keep values concise. Leave field blank if not mentioned.\n\nClinical note:\n" + note
+          }]
+        })
+      })
+      .then(function(r){ return r.json(); })
+      .then(function(data){
+        var text = (data.content && data.content[0] && data.content[0].text) || "";
+        var clean = text.replace(/```json|```/g,"").trim();
+        var obj;
+        try{ obj = JSON.parse(clean); } catch(e){ throw new Error("Could not parse AI response."); }
+
+        // Apply to form
+        if(obj.type && ["antenatal","postnatal","gynae"].includes(obj.type)) setTypeUI(obj.type);
+        if(obj.acuity && ["stable","review","urgent"].includes(obj.acuity)) setAcuityUI(obj.acuity);
+
+        function setVal(id, v){ var el=document.getElementById(id); if(el && v) el.value=v; }
+        setVal("f_diagnosis",  obj.diagnosis);
+        setVal("f_gestation",  obj.gestation);
+        setVal("f_medication", obj.medication);
+        setVal("f_situation",  obj.situation);
+        setVal("f_plan",       obj.plan);
+        setVal("f_age",        obj.age);
+        if(obj.allergy){ var al=document.getElementById("f_allergy"); if(al) al.value=obj.allergy.toUpperCase(); }
+        if(obj.flags && obj.flags.length){ setSelectedFlags(obj.flags.map(function(f){ return f.toUpperCase(); })); }
+
+        // Set urgency for urgent acuity
+        if(obj.acuity === "urgent"){
+          setAcuityUI("urgent");
+        }
+
+        // Show summary
+        var summary = [];
+        if(obj.type)      summary.push("Type: " + obj.type);
+        if(obj.acuity)    summary.push("Acuity: " + obj.acuity);
+        if(obj.diagnosis) summary.push("Dx: " + obj.diagnosis);
+        if(obj.gestation) summary.push("Gestation: " + obj.gestation);
+        if(obj.flags && obj.flags.length) summary.push("Flags: " + obj.flags.join(", "));
+        resultEl.innerHTML = "✅ <strong>AI filled " + summary.length + " fields.</strong> Please review and edit before saving.<br><span style='color:rgba(255,255,255,0.5);font-size:0.75rem;'>" + summary.join(" · ") + "</span>";
+        resultEl.style.display = "block";
+        statusEl.textContent = "";
+
+        // Collapse the panel
+        body.style.display = "none";
+        chevron.style.transform = "";
+      })
+      .catch(function(err){
+        statusEl.textContent = "⚠️ " + (err.message || "AI error. Check connection.");
+      })
+      .finally(function(){
+        runBtn.disabled = false;
+        runBtn.textContent = "✨ Fill form with AI";
+      });
+    };
+  })();
+
+
+  /* ============================================================
+     FEATURE 2 — QR CODES PER BED
+     Generates a QR code for the current bed URL, allows printing
+     a single QR or a full sheet of all bed QR codes.
+  ============================================================ */
+  (function(){
+    var qrOverlay = document.getElementById("qrOverlay");
+    var closeBtn  = document.getElementById("closeQrModal");
+    var printBtn  = document.getElementById("qrPrintBtn");
+    var printAllBtn = document.getElementById("qrPrintAllBtn");
+    var container = document.getElementById("qrCodeContainer");
+    var bedLabel  = document.getElementById("qrBedLabel");
+    var titleEl   = document.getElementById("qrModalTitle");
+    var _currentQRBed = null;
+
+    if(!qrOverlay) return;
+    if(closeBtn) closeBtn.onclick = function(){ qrOverlay.classList.remove("show"); };
+
+    window.openQRModal = function(room, bed){
+      _currentQRBed = {room:room, bed:bed};
+      container.innerHTML = "";
+      var bedId = room + bed;
+      var url = window.location.origin + window.location.pathname + "?ward=" + encodeURIComponent(activeWardId) + "&bed=" + encodeURIComponent(bedId);
+      titleEl.textContent = "QR Code — Bed " + bedId;
+      bedLabel.textContent = "Scan to open " + (state.wards[activeWardId] ? state.wards[activeWardId].name : "") + " · Bed " + bedId;
+
+      if(window.QRCode){
+        new QRCode(container, { text: url, width: 200, height: 200, colorDark: "#000000", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.M });
+      } else {
+        container.innerHTML = '<p style="color:rgba(255,255,255,0.5);font-size:0.8rem;">QR library not loaded. Check internet connection.</p>';
+      }
+      qrOverlay.classList.add("show");
+    };
+
+    if(printBtn) printBtn.onclick = function(){
+      if(!_currentQRBed) return;
+      var bedId = _currentQRBed.room + _currentQRBed.bed;
+      var url   = window.location.origin + window.location.pathname + "?ward=" + encodeURIComponent(activeWardId) + "&bed=" + encodeURIComponent(bedId);
+      var wardName = state.wards[activeWardId] ? state.wards[activeWardId].name : "";
+      var win = window.open("","_blank");
+      var tmp = document.createElement("div");
+      if(window.QRCode) new QRCode(tmp, { text: url, width: 220, height: 220, colorDark: "#000", colorLight: "#fff", correctLevel: QRCode.CorrectLevel.M });
+      setTimeout(function(){
+        win.document.write('<html><head><title>QR — '+bedId+'</title><style>body{font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#fff;}h2{margin-bottom:4px;font-size:1.1rem;}p{color:#666;font-size:0.85rem;margin-top:8px;}</style></head><body><h2>'+wardName+' · Bed '+bedId+'</h2>'+tmp.innerHTML+'<p>'+url+'</p></body></html>');
+        win.document.close(); win.print();
+      }, 300);
+    };
+
+    if(printAllBtn) printAllBtn.onclick = function(){
+      var w = currentWard();
+      var wardName = w.name || "";
+      var rc = w.roomCount || ROOMS_PER_WARD;
+      var beds = [];
+      for(var r=1; r<=rc; r++){ beds.push({room:String(r),bed:"A"}); beds.push({room:String(r),bed:"B"}); }
+
+      var win = window.open("","_blank");
+      win.document.write('<html><head><title>All QR Codes — '+wardName+'</title><style>body{font-family:sans-serif;margin:0;padding:16px;background:#fff;}h1{font-size:1rem;margin-bottom:16px;}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;}.item{border:1px solid #ddd;border-radius:8px;padding:12px;text-align:center;page-break-inside:avoid;}.item h3{font-size:0.8rem;margin:0 0 8px;}@media print{.no-print{display:none;}}</style></head><body><h1>'+wardName+' — All Bed QR Codes</h1><button class="no-print" onclick="window.print()" style="margin-bottom:12px;padding:8px 16px;background:#0d7a68;color:#fff;border:none;border-radius:6px;cursor:pointer;">Print</button><div class="grid" id="allQrGrid"></div></body></html>');
+      win.document.close();
+
+      beds.forEach(function(b){
+        var bedId = b.room + b.bed;
+        var url   = window.location.origin + window.location.pathname + "?ward=" + encodeURIComponent(activeWardId) + "&bed=" + encodeURIComponent(bedId);
+        var item  = win.document.createElement("div");
+        item.className = "item";
+        item.innerHTML = "<h3>Bed " + bedId + "</h3>";
+        win.document.getElementById("allQrGrid").appendChild(item);
+        if(window.QRCode) new QRCode(item, { text: url, width: 120, height: 120, colorDark: "#000", colorLight: "#fff", correctLevel: QRCode.CorrectLevel.M });
+      });
+    };
+
+    // On page load: check URL params and jump to bed
+    (function(){
+      var params = new URLSearchParams(window.location.search);
+      var targetWard = params.get("ward");
+      var targetBed  = params.get("bed");
+      if(targetWard && targetBed){
+        setTimeout(function(){
+          if(state.wards[targetWard]){
+            activeWardId = targetWard;
+            render();
+          }
+          var card = document.getElementById("card_" + targetBed);
+          if(card){
+            card.scrollIntoView({behavior:"smooth", block:"center"});
+            card.style.outline = "3px solid #0fb898";
+            card.style.outlineOffset = "3px";
+            setTimeout(function(){ card.style.outline = ""; card.style.outlineOffset = ""; }, 3000);
+          }
+        }, 800);
+      }
+    })();
+  })();
+
+
+  /* ============================================================
+     FEATURE 3 — DIGITAL HANDOVER SIGN-OFF
+     Lead PIN-confirms handover, stored with name + timestamp.
+     Signed handovers are locked, viewable in a history modal.
+  ============================================================ */
+  (function(){
+    var signoffOverlay  = document.getElementById("signoffOverlay");
+    var closeSignoff    = document.getElementById("closeSignoffModal");
+    var signoffPin      = document.getElementById("signoffPin");
+    var signoffError    = document.getElementById("signoffError");
+    var signoffPreview  = document.getElementById("signoffPreview");
+    var confirmSignoff  = document.getElementById("confirmSignoffBtn");
+    var signedOverlay   = document.getElementById("signedHandoversOverlay");
+    var closeSigned     = document.getElementById("closeSignedHandoversModal");
+    var signedBody      = document.getElementById("signedHandoversBody");
+
+    if(!signoffOverlay) return;
+
+    // Initialise signed handover store
+    if(!state.signedHandovers) state.signedHandovers = [];
+
+    var _pendingHandoverContent = null;
+    var _pendingHandoverWard    = null;
+
+    // Open sign-off modal
+    var signBtn = document.getElementById("signHandoverBtn");
+    if(signBtn) signBtn.onclick = function(){
+      document.getElementById("overflowMenu").style.display = "none";
+      // Build a snapshot of current ward handover text
+      _pendingHandoverWard    = currentWard().name;
+      _pendingHandoverContent = buildHandoverText(activeWardId);
+      var now   = new Date();
+      var staff = getStaffName() || "Unknown Lead";
+      signoffPreview.innerHTML =
+        "<strong>" + escapeHtml(staff) + "</strong><br>" +
+        "Ward: " + escapeHtml(_pendingHandoverWard) + "<br>" +
+        "Date: " + now.toLocaleDateString([], {weekday:"short",day:"2-digit",month:"short",year:"numeric"}) + " · " + now.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
+      signoffPin.value = "";
+      signoffError.style.display = "none";
+      signoffOverlay.classList.add("show");
+    };
+
+    if(closeSignoff) closeSignoff.onclick = function(){ signoffOverlay.classList.remove("show"); };
+
+    if(confirmSignoff) confirmSignoff.onclick = function(){
+      var pin = (signoffPin.value || "").trim();
+      if(!checkPin(pin)){
+        signoffError.textContent = "❌ Incorrect PIN. Only the Lead can sign off a handover.";
+        signoffError.style.display = "block";
+        signoffPin.value = "";
+        return;
+      }
+      signoffError.style.display = "none";
+
+      if(!state.signedHandovers) state.signedHandovers = [];
+      var entry = {
+        id:        "sh_" + Date.now().toString(36),
+        ward:      _pendingHandoverWard,
+        content:   _pendingHandoverContent,
+        signedBy:  getStaffName() || "Lead",
+        signedAt:  nowISO(),
+        locked:    true
+      };
+      state.signedHandovers.unshift(entry);
+      // Keep last 60 signed handovers
+      if(state.signedHandovers.length > 60) state.signedHandovers = state.signedHandovers.slice(0, 60);
+
+      hodLog("handover", "Signed handover — " + entry.ward + " · " + entry.signedBy, entry.ward);
+      saveState();
+      signoffOverlay.classList.remove("show");
+
+      // Show a brief confirmation toast
+      var toast = document.createElement("div");
+      toast.textContent = "✅ Handover signed by " + entry.signedBy;
+      toast.style.cssText = "position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#0d7a68;color:#fff;padding:12px 20px;border-radius:10px;font-weight:600;font-size:0.88rem;z-index:9999;";
+      document.body.appendChild(toast);
+      setTimeout(function(){ toast.remove(); }, 3000);
+    };
+
+    // Helper: build readable handover text from ward state
+    function buildHandoverText(wardId){
+      var w = state.wards[wardId];
+      if(!w) return "";
+      var lines = ["HANDOVER — " + w.name + " — " + new Date().toLocaleString(), ""];
+      Object.keys(w.rooms).sort().forEach(function(bKey){
+        var p = w.rooms[bKey];
+        if(!p) return;
+        lines.push("Bed " + bKey + ": " + (p.name||"") + (p.age ? " · " + p.age : "") + " — " + (p.diagnosis||"") + (p.gestation ? " [" + p.gestation + "]" : ""));
+        if(p.situation) lines.push("  Situation: " + p.situation);
+        if(p.plan)      lines.push("  Plan: " + p.plan);
+        if(p.acuity)    lines.push("  Acuity: " + p.acuity.toUpperCase());
+        lines.push("");
+      });
+      return lines.join("\n");
+    }
+
+    // View signed handovers
+    var viewBtn = document.getElementById("viewSignedHandoversBtn");
+    if(viewBtn) viewBtn.onclick = function(){
+      document.getElementById("overflowMenu").style.display = "none";
+      renderSignedHandovers();
+      signedOverlay.classList.add("show");
+    };
+    if(closeSigned) closeSigned.onclick = function(){ signedOverlay.classList.remove("show"); };
+
+    function renderSignedHandovers(){
+      var list = (state.signedHandovers || []);
+      if(!list.length){
+        signedBody.innerHTML = '<div style="padding:32px;text-align:center;color:rgba(255,255,255,0.4);font-size:0.9rem;">No signed handovers yet. Use ✍️ Sign off handover after exporting.</div>';
+        return;
+      }
+      signedBody.innerHTML = list.map(function(entry){
+        return '<div style="padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.08);">' +
+          '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">' +
+          '<span style="font-size:0.75rem;font-weight:700;background:rgba(13,122,104,0.2);color:#0fb898;padding:3px 10px;border-radius:100px;">✍️ SIGNED</span>' +
+          '<span style="font-size:0.82rem;color:rgba(255,255,255,0.6);">' + escapeHtml(entry.ward) + ' · ' + fmtTime(entry.signedAt) + '</span>' +
+          '</div>' +
+          '<div style="font-size:0.85rem;font-weight:600;color:#fff;margin-bottom:8px;">Signed by: ' + escapeHtml(entry.signedBy) + '</div>' +
+          '<pre style="font-size:0.72rem;color:rgba(255,255,255,0.5);white-space:pre-wrap;background:rgba(0,0,0,0.3);border-radius:8px;padding:12px;max-height:160px;overflow-y:auto;">' + escapeHtml(entry.content) + '</pre>' +
+          '</div>';
+      }).join("");
+    }
+  })();
+
+
+  /* ============================================================
+     FEATURE 4 — THEATRE LIST
+     Patients flagged THEATRE on the board auto-appear.
+     Status pipeline: Scheduled → Prep → In Theatre → Recovery → Done
+     Updating status syncs back to the ward card acuity.
+  ============================================================ */
+  (function(){
+    var theatreOverlay = document.getElementById("theatreOverlay");
+    var closeBtn       = document.getElementById("closeTheatreModal");
+    var listBody       = document.getElementById("theatreListBody");
+    var dateLabel      = document.getElementById("theatreDateLabel");
+    var printBtn       = document.getElementById("theatrePrintBtn");
+
+    if(!theatreOverlay) return;
+
+    var STATUSES = ["Scheduled","Prep","In Theatre","Recovery","Done"];
+    var STATUS_COLOR = { "Scheduled":"rgba(52,152,219,0.15)", "Prep":"rgba(240,165,0,0.15)", "In Theatre":"rgba(224,82,82,0.15)", "Recovery":"rgba(155,89,182,0.15)", "Done":"rgba(46,204,113,0.15)" };
+    var STATUS_LABEL_COLOR = { "Scheduled":"#3498db", "Prep":"#f0a500", "In Theatre":"#e05252", "Recovery":"#9b59b6", "Done":"#2ecc71" };
+
+    if(!state.theatreList) state.theatreList = {};
+
+    var openTheatreBtn = document.getElementById("theatreListBtn");
+    if(openTheatreBtn) openTheatreBtn.onclick = function(){
+      document.getElementById("overflowMenu").style.display = "none";
+      openTheatreModal();
+    };
+    if(closeBtn) closeBtn.onclick = function(){ theatreOverlay.classList.remove("show"); };
+
+    function openTheatreModal(){
+      dateLabel.textContent = "Today · " + new Date().toLocaleDateString([],{weekday:"long",day:"2-digit",month:"long",year:"numeric"});
+      renderTheatreList();
+      theatreOverlay.classList.add("show");
+    }
+
+    function getTheatrePatients(){
+      // Collect all THEATRE-flagged patients across all wards
+      var patients = [];
+      state.wardOrder.forEach(function(wid){
+        var w = state.wards[wid];
+        if(!w || !w.rooms) return;
+        Object.keys(w.rooms).forEach(function(bKey){
+          var p = w.rooms[bKey];
+          if(!p) return;
+          if(p.flags && p.flags.indexOf("THEATRE") !== -1){
+            var tlKey = wid + "_" + bKey;
+            patients.push({
+              wardId:  wid,
+              wardName: w.name,
+              bedKey:  bKey,
+              tlKey:   tlKey,
+              patient: p,
+              theatreInfo: state.theatreList[tlKey] || { status:"Scheduled", procedure:"", slot:"", surgeon:"", anaesthetist:"" }
+            });
+          }
+        });
+      });
+      return patients;
+    }
+
+    function renderTheatreList(){
+      var patients = getTheatrePatients();
+      if(!patients.length){
+        listBody.innerHTML = '<div style="padding:32px;text-align:center;color:rgba(255,255,255,0.4);font-size:0.9rem;">No patients flagged 🔪 THEATRE on the board.<br>Add the THEATRE flag to a patient card to include them here.</div>';
+        return;
+      }
+
+      listBody.innerHTML = patients.map(function(item, idx){
+        var p  = item.patient;
+        var ti = item.theatreInfo;
+        var sc = STATUS_COLOR[ti.status] || STATUS_COLOR["Scheduled"];
+        var slc = STATUS_LABEL_COLOR[ti.status] || "#3498db";
+        return '<div style="padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.07);" id="tl_item_'+idx+'">' +
+          '<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">' +
+          '<span style="font-weight:700;font-size:0.9rem;color:#fff;">' + escapeHtml(p.name||item.bedKey) + (p.age?" · "+escapeHtml(p.age):"") + '</span>' +
+          '<span style="font-size:0.75rem;color:rgba(255,255,255,0.4);">' + escapeHtml(item.wardName) + ' · Bed ' + item.bedKey + '</span>' +
+          '<span style="margin-left:auto;font-size:0.72rem;font-weight:700;padding:3px 10px;border-radius:100px;background:'+sc+';color:'+slc+';">' + escapeHtml(ti.status) + '</span>' +
+          '</div>' +
+          '<div style="font-size:0.8rem;color:rgba(255,255,255,0.6);margin-bottom:10px;">' + escapeHtml(p.diagnosis||"") + (p.gestation?" · "+escapeHtml(p.gestation):"") + '</div>' +
+          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">' +
+          '<div><label style="font-size:0.65rem;text-transform:uppercase;letter-spacing:0.06em;color:rgba(255,255,255,0.35);display:block;margin-bottom:3px;">Procedure</label><input data-tlkey="'+item.tlKey+'" data-field="procedure" value="'+escapeHtml(ti.procedure||"")+'" placeholder="e.g. LSCS" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:7px 9px;color:#fff;font-size:0.8rem;font-family:inherit;"></div>' +
+          '<div><label style="font-size:0.65rem;text-transform:uppercase;letter-spacing:0.06em;color:rgba(255,255,255,0.35);display:block;margin-bottom:3px;">Slot time</label><input data-tlkey="'+item.tlKey+'" data-field="slot" value="'+escapeHtml(ti.slot||"")+'" placeholder="e.g. 14:00" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:7px 9px;color:#fff;font-size:0.8rem;font-family:inherit;"></div>' +
+          '<div><label style="font-size:0.65rem;text-transform:uppercase;letter-spacing:0.06em;color:rgba(255,255,255,0.35);display:block;margin-bottom:3px;">Surgeon</label><input data-tlkey="'+item.tlKey+'" data-field="surgeon" value="'+escapeHtml(ti.surgeon||"")+'" placeholder="Dr …" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:7px 9px;color:#fff;font-size:0.8rem;font-family:inherit;"></div>' +
+          '<div><label style="font-size:0.65rem;text-transform:uppercase;letter-spacing:0.06em;color:rgba(255,255,255,0.35);display:block;margin-bottom:3px;">Anaesthetist</label><input data-tlkey="'+item.tlKey+'" data-field="anaesthetist" value="'+escapeHtml(ti.anaesthetist||"")+'" placeholder="Dr …" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:7px 9px;color:#fff;font-size:0.8rem;font-family:inherit;"></div>' +
+          '</div>' +
+          '<div style="display:flex;gap:6px;flex-wrap:wrap;">' +
+          STATUSES.map(function(s){
+            var active = ti.status === s;
+            return '<button data-tlkey="'+item.tlKey+'" data-wardid="'+item.wardId+'" data-bedkey="'+item.bedKey+'" data-status="'+s+'" style="padding:5px 11px;border-radius:6px;border:'+(active?"2px solid "+slc:"1px solid rgba(255,255,255,0.1)")+';background:'+(active?sc:"transparent")+';color:'+(active?slc:"rgba(255,255,255,0.5)")+';font-size:0.73rem;font-weight:600;cursor:pointer;font-family:inherit;">'+s+'</button>';
+          }).join("") +
+          '</div>' +
+          '</div>';
+      }).join("");
+
+      // Wire inputs
+      listBody.querySelectorAll("input[data-tlkey]").forEach(function(inp){
+        inp.oninput = function(){
+          var key   = inp.getAttribute("data-tlkey");
+          var field = inp.getAttribute("data-field");
+          if(!state.theatreList[key]) state.theatreList[key] = { status:"Scheduled" };
+          state.theatreList[key][field] = inp.value;
+          saveState();
+        };
+      });
+
+      // Wire status buttons
+      listBody.querySelectorAll("button[data-status]").forEach(function(btn){
+        btn.onclick = function(){
+          var key    = btn.getAttribute("data-tlkey");
+          var status = btn.getAttribute("data-status");
+          var wardId = btn.getAttribute("data-wardid");
+          var bedKey = btn.getAttribute("data-bedkey");
+          if(!state.theatreList[key]) state.theatreList[key] = {};
+          state.theatreList[key].status = status;
+          // Sync acuity back to ward card
+          if(state.wards[wardId] && state.wards[wardId].rooms[bedKey]){
+            var acuityMap = { "In Theatre":"urgent", "Prep":"review", "Recovery":"review", "Scheduled":"stable", "Done":"stable" };
+            state.wards[wardId].rooms[bedKey].acuity = acuityMap[status] || "stable";
+            hodLog("progress", "Theatre status: " + (state.wards[wardId].rooms[bedKey].name||bedKey) + " → " + status, state.wards[wardId].name);
+          }
+          saveState();
+          render();
+          renderTheatreList();
+        };
+      });
+    }
+
+    // Print theatre list
+    if(printBtn) printBtn.onclick = function(){
+      var patients = getTheatrePatients();
+      var html = '<html><head><title>Theatre List</title><style>body{font-family:sans-serif;padding:20px;}h1{font-size:1.1rem;margin-bottom:4px;}p.meta{font-size:0.8rem;color:#666;margin-bottom:16px;}table{width:100%;border-collapse:collapse;font-size:0.85rem;}th{text-align:left;padding:8px;border-bottom:2px solid #000;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.04em;}td{padding:8px;border-bottom:1px solid #ddd;}@media print{button{display:none;}}</style></head><body>';
+      html += '<h1>🔪 Theatre List — ' + new Date().toLocaleDateString([],{weekday:"long",day:"2-digit",month:"long",year:"numeric"}) + '</h1>';
+      html += '<p class="meta">Printed from Ward Board · ' + new Date().toLocaleTimeString() + '</p>';
+      html += '<table><thead><tr><th>#</th><th>Patient</th><th>Ward/Bed</th><th>Diagnosis</th><th>Procedure</th><th>Slot</th><th>Surgeon</th><th>Anaesthetist</th><th>Status</th></tr></thead><tbody>';
+      patients.forEach(function(item, i){
+        var ti = item.theatreInfo;
+        var p  = item.patient;
+        html += '<tr><td>'+(i+1)+'</td><td>'+(p.name||item.bedKey)+(p.age?" · "+p.age:"")+'</td><td>'+item.wardName+' · '+item.bedKey+'</td><td>'+(p.diagnosis||"")+(p.gestation?" ["+p.gestation+"]":"")+'</td><td>'+(ti.procedure||"")+'</td><td>'+(ti.slot||"")+'</td><td>'+(ti.surgeon||"")+'</td><td>'+(ti.anaesthetist||"")+'</td><td>'+(ti.status||"Scheduled")+'</td></tr>';
+      });
+      html += '</tbody></table></body></html>';
+      var win = window.open("","_blank");
+      win.document.write(html);
+      win.document.close();
+      setTimeout(function(){ win.print(); }, 300);
+    };
+  })();
+
+
+})(); // end main IIFE
