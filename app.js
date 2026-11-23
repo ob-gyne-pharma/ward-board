@@ -137,28 +137,42 @@
   }
 
   /* ============================================================
-     LEAD ACCESS CONTROL
-     Default PIN: 1234  (Lead should change it on first use)
-     PIN is stored hashed (simple FNV-32) in localStorage.
+     LEAD ACCESS CONTROL — v3.0
+     PIN is now SHA-256 hashed and stored in Firebase per department.
+     Never stored in localStorage. Verified server-side via firebasePin.
      Session unlocked flag lives only in memory — resets on reload.
   ============================================================ */
-  var LEAD_PIN_KEY  = "ward_board_lead_pin";
-  var LEAD_DEFAULT  = "1234";
-  var hodUnlocked  = false;
+  var hodUnlocked = false;
 
-  function fnv32(str){
-    var h = 0x811c9dc5;
-    for(var i=0;i<str.length;i++){ h ^= str.charCodeAt(i); h = (h * 0x01000193) >>> 0; }
-    return h.toString(16);
+  /* Async PIN check — calls Firebase */
+  function checkPin(pin, callback) {
+    if(window.firebasePin && window.firebasePin.verify) {
+      window.firebasePin.verify(pin).then(function(ok) {
+        callback(ok);
+      }).catch(function() { callback(false); });
+    } else {
+      // Fallback during Firebase init — deny access
+      callback(false);
+    }
   }
-  function getStoredPinHash(){
-    return localStorage.getItem(LEAD_PIN_KEY) || fnv32(LEAD_DEFAULT);
+
+  /* Change PIN — stores new hash in Firebase */
+  function savePin(pin) {
+    if(window.firebasePin && window.firebasePin.change) {
+      window.firebasePin.change(pin).then(function() {
+        showToast("✅ PIN updated successfully");
+      }).catch(function() {
+        showToast("❌ Failed to update PIN — check connection");
+      });
+    }
   }
-  function checkPin(pin){
-    return fnv32(pin) === getStoredPinHash();
-  }
-  function savePin(pin){
-    localStorage.setItem(LEAD_PIN_KEY, fnv32(pin));
+
+  /* Migrate legacy FNV PIN from localStorage if present */
+  function migrateLegacyPin() {
+    if(window.firebasePin && window.firebasePin.hasLegacyPin && window.firebasePin.hasLegacyPin()) {
+      window.firebasePin.clearLegacy();
+      showToast("🔐 PIN security upgraded — please set a new PIN in Lead Panel");
+    }
   }
 
   /* Log an event to state.hodLog (last 30 days rolling) */
@@ -224,17 +238,23 @@
   document.getElementById("submitHodPin").onclick = function(){
     var pin = (document.getElementById("hodPinInput").value || "").trim();
     var err = document.getElementById("hodPinError");
+    var btn = document.getElementById("submitHodPin");
     if(!pin){ err.textContent="Please enter the PIN."; err.style.display="block"; return; }
-    if(checkPin(pin)){
-      closeHodPin();
-      unlockHod();
-      openHodPanel();
-    } else {
-      err.textContent = "❌ Incorrect PIN. Try again.";
-      err.style.display = "block";
-      document.getElementById("hodPinInput").value = "";
-      document.getElementById("hodPinInput").focus();
-    }
+    btn.textContent = "Checking…"; btn.disabled = true;
+    checkPin(pin, function(ok) {
+      btn.textContent = "Unlock"; btn.disabled = false;
+      if(ok){
+        closeHodPin();
+        unlockHod();
+        openHodPanel();
+        migrateLegacyPin();
+      } else {
+        err.textContent = "❌ Incorrect PIN. Try again.";
+        err.style.display = "block";
+        document.getElementById("hodPinInput").value = "";
+        document.getElementById("hodPinInput").focus();
+      }
+    });
   };
 
   /* Lead Panel */
@@ -250,8 +270,86 @@
     renderStaffMgmt();
     renderHodHistWardFilter();
     renderHodHistory();
+    renderOrgContext();
     ov.classList.add("show");
   }
+
+  /* Org context display in Lead Panel */
+  function renderOrgContext() {
+    var el = document.getElementById("hodOrgContext");
+    if(!el) return;
+    var hospName = localStorage.getItem("wb_hosp_name") || "—";
+    var deptName = localStorage.getItem("wb_dept_name") || "—";
+    el.innerHTML =
+      '<div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:rgba(255,255,255,0.35);margin-bottom:6px;">Current organisation</div>' +
+      '<div style="font-size:0.9rem;font-weight:600;color:#fff;margin-bottom:2px;">🏥 ' + escapeHtml(hospName) + '</div>' +
+      '<div style="font-size:0.82rem;color:rgba(255,255,255,0.6);">🩺 ' + escapeHtml(deptName) + '</div>';
+  }
+
+  /* Backup export */
+  (function(){
+    var backupBtn = document.getElementById("hodBackupBtn");
+    if(!backupBtn) return;
+    backupBtn.onclick = function() {
+      backupBtn.textContent = "⏳ Exporting…"; backupBtn.disabled = true;
+      var doExport = function(data) {
+        var json = JSON.stringify(data, null, 2);
+        var blob = new Blob([json], {type:"application/json"});
+        var url  = URL.createObjectURL(blob);
+        var a    = document.createElement("a");
+        var date = new Date().toISOString().slice(0,10);
+        a.href = url;
+        a.download = "wardboard-backup-" + date + ".json";
+        document.body.appendChild(a); a.click();
+        document.body.removeChild(a); URL.revokeObjectURL(url);
+        backupBtn.textContent = "✅ Backup downloaded"; backupBtn.disabled = false;
+        setTimeout(function(){ backupBtn.textContent = "💾 Export backup"; }, 3000);
+      };
+      // Try Firebase export first, fall back to local state
+      if(window.firebaseBackup && window.firebaseBackup.exportFull) {
+        window.firebaseBackup.exportFull().then(doExport).catch(function() {
+          // Fallback: export local state
+          doExport({ exportedAt: new Date().toISOString(), source: "localStorage", state: state });
+        });
+      } else {
+        doExport({ exportedAt: new Date().toISOString(), source: "localStorage", state: state });
+      }
+    };
+  })();
+
+  /* Change PIN from Lead Panel */
+  (function(){
+    var changePinBtn = document.getElementById("hodChangePinBtn");
+    if(!changePinBtn) return;
+    changePinBtn.onclick = function() {
+      var newPin = prompt("Enter new PIN (4–8 digits):");
+      if(!newPin || newPin.trim().length < 4) { showToast("PIN must be at least 4 digits"); return; }
+      if(!/^\d+$/.test(newPin.trim())) { showToast("PIN must be digits only"); return; }
+      savePin(newPin.trim());
+    };
+  })();
+
+  /* Switch department */
+  (function(){
+    var switchBtn = document.getElementById("hodSwitchDeptBtn");
+    if(!switchBtn) return;
+    switchBtn.onclick = function() {
+      if(window.firebaseAuth && window.firebaseAuth.loadHospitals) {
+        switchBtn.textContent = "Loading…"; switchBtn.disabled = true;
+        window.firebaseAuth.loadHospitals().then(function(hospitals) {
+          switchBtn.textContent = "🔀 Switch department"; switchBtn.disabled = false;
+          document.getElementById("hodPanelOverlay").classList.remove("show");
+          lockHod();
+          if(window.showOrgSelection && window.firebaseAuth.currentUser()) {
+            window.showOrgSelection(window.firebaseAuth.currentUser(), hospitals);
+          }
+        }).catch(function() {
+          switchBtn.textContent = "🔀 Switch department"; switchBtn.disabled = false;
+          showToast("⚠️ Could not load hospitals");
+        });
+      }
+    };
+  })();
 
   document.getElementById("closeHodPanel").onclick  = function(){ document.getElementById("hodPanelOverlay").classList.remove("show"); };
   document.getElementById("hod_lockBtn").onclick    = lockHod;
@@ -828,24 +926,126 @@
   /* Called by firebase-sync.js when user logs in successfully */
   window.onAuthReady = function(user, data){
     if(window._hideLoading) window._hideLoading();
-    var authOv = document.getElementById("authOverlay");
-    var pendOv = document.getElementById("pendingOverlay");
-    if(authOv) authOv.classList.remove("show");
-    if(pendOv) pendOv.classList.remove("show");
+    // Hide org selection, auth, pending overlays
+    ["authOverlay","pendingOverlay","orgSelectionOverlay"].forEach(function(id){
+      var el = document.getElementById(id); if(el) el.classList.remove("show");
+    });
     var appContent = document.getElementById("appContent");
     if(appContent) appContent.style.display = "block";
-    // Sync display name into app's staff name system
+    // Sync display name
     var displayName = user.displayName || user.email.split("@")[0];
     setStaffName(displayName);
     var btn = document.getElementById("staffNameBtn");
     if(btn) btn.textContent = "👤 " + displayName;
-    // Save email for next login
     localStorage.setItem("wb_last_email", user.email);
-    // Request FCM token if notifications granted
+    // Show org context in header
+    if(window.firebaseSync && window.firebaseSync.getContext) {
+      var ctx = window.firebaseSync.getContext();
+      var ctxEl = document.getElementById("orgContextLabel");
+      if(ctxEl && ctx) ctxEl.textContent = "";  // Will be set after hospital name loads
+      // Load hospital + dept names for display
+      if(ctx.hospitalId && ctx.deptId) {
+        Promise.all([
+          fetch ? null : null // names loaded from org selection cache below
+        ]);
+        var cachedHospName = localStorage.getItem("wb_hosp_name") || ctx.hospitalId;
+        var cachedDeptName = localStorage.getItem("wb_dept_name") || ctx.deptId;
+        if(ctxEl) ctxEl.textContent = cachedHospName + " · " + cachedDeptName;
+      }
+    }
+    // Migrate legacy PIN if present
+    migrateLegacyPin();
+    // FCM
     if(Notification.permission === "granted" && window.requestFCMToken){
       window.requestFCMToken().catch(function(e){ console.warn("FCM token error:", e); });
     }
     console.log("[Auth] Signed in as:", displayName);
+  };
+
+  /* ── Org Selection Screen ── */
+  window.showOrgSelection = function(user, hospitals) {
+    if(window._hideLoading) window._hideLoading();
+    var appContent = document.getElementById("appContent");
+    if(appContent) appContent.style.display = "none";
+    var authOv = document.getElementById("authOverlay");
+    if(authOv) authOv.classList.remove("show");
+    var orgOv = document.getElementById("orgSelectionOverlay");
+    if(orgOv) orgOv.classList.add("show");
+
+    var hospList = document.getElementById("orgHospitalList");
+    var deptSection = document.getElementById("orgDeptSection");
+    var deptList = document.getElementById("orgDeptList");
+    var orgConfirmBtn = document.getElementById("orgConfirmBtn");
+    var orgStatusMsg = document.getElementById("orgStatusMsg");
+    var selectedHospId = null, selectedDeptId = null;
+
+    if(!hospList) return;
+
+    // Render hospitals
+    var hospKeys = Object.keys(hospitals);
+    if(hospKeys.length === 0) {
+      hospList.innerHTML = '<p style="color:rgba(255,255,255,0.4);font-size:0.85rem;padding:12px 0;">No hospitals registered yet. Contact your system administrator.</p>';
+    } else {
+      hospList.innerHTML = hospKeys.map(function(hid) {
+        var h = hospitals[hid];
+        return '<button class="org-select-btn" data-id="'+hid+'" style="width:100%;text-align:left;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:12px 16px;color:#fff;font-size:0.9rem;font-weight:600;cursor:pointer;margin-bottom:8px;font-family:inherit;">🏥 '+escapeHtml(h.name||hid)+'</button>';
+      }).join("");
+    }
+
+    // Hospital selection
+    hospList.querySelectorAll(".org-select-btn").forEach(function(btn) {
+      btn.onclick = function() {
+        hospList.querySelectorAll(".org-select-btn").forEach(function(b){ b.style.borderColor="rgba(255,255,255,0.1)"; b.style.background="rgba(255,255,255,0.05)"; });
+        btn.style.borderColor = "#0fb898"; btn.style.background = "rgba(13,122,104,0.15)";
+        selectedHospId = btn.getAttribute("data-id");
+        selectedDeptId = null;
+        if(orgConfirmBtn) orgConfirmBtn.disabled = true;
+        if(deptSection) deptSection.style.display = "block";
+        if(deptList) deptList.innerHTML = '<p style="color:rgba(255,255,255,0.4);font-size:0.82rem;">Loading departments…</p>';
+        // Load departments for selected hospital
+        if(window.firebaseLoadDepts) {
+          window.firebaseLoadDepts(selectedHospId).then(function(depts) {
+            var deptKeys = Object.keys(depts);
+            if(deptKeys.length === 0) {
+              deptList.innerHTML = '<p style="color:rgba(255,255,255,0.4);font-size:0.82rem;">No departments found. Contact your hospital administrator.</p>';
+            } else {
+              deptList.innerHTML = deptKeys.map(function(did) {
+                var d = depts[did];
+                return '<button class="dept-select-btn" data-id="'+did+'" data-name="'+escapeHtml(d.name||did)+'" style="width:100%;text-align:left;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:11px 16px;color:#fff;font-size:0.85rem;font-weight:600;cursor:pointer;margin-bottom:8px;font-family:inherit;">🩺 '+escapeHtml(d.name||did)+'</button>';
+              }).join("");
+              deptList.querySelectorAll(".dept-select-btn").forEach(function(db2) {
+                db2.onclick = function() {
+                  deptList.querySelectorAll(".dept-select-btn").forEach(function(b){ b.style.borderColor="rgba(255,255,255,0.1)"; b.style.background="rgba(255,255,255,0.05)"; });
+                  db2.style.borderColor = "#0fb898"; db2.style.background = "rgba(13,122,104,0.15)";
+                  selectedDeptId = db2.getAttribute("data-id");
+                  // Cache names for header display
+                  var hName = hospitals[selectedHospId] ? (hospitals[selectedHospId].name||selectedHospId) : selectedHospId;
+                  localStorage.setItem("wb_hosp_name", hName);
+                  localStorage.setItem("wb_dept_name", db2.getAttribute("data-name")||selectedDeptId);
+                  if(orgConfirmBtn) orgConfirmBtn.disabled = false;
+                };
+              });
+            }
+          });
+        }
+      };
+    });
+
+    // Confirm button
+    if(orgConfirmBtn) {
+      orgConfirmBtn.disabled = true;
+      orgConfirmBtn.onclick = function() {
+        if(!selectedHospId || !selectedDeptId) return;
+        orgConfirmBtn.textContent = "Connecting…"; orgConfirmBtn.disabled = true;
+        if(orgStatusMsg) orgStatusMsg.textContent = "";
+        if(window.firebaseSetOrgContext) {
+          window.firebaseSetOrgContext(user, selectedHospId, selectedDeptId).catch(function(err) {
+            orgConfirmBtn.textContent = "Go to ward →"; orgConfirmBtn.disabled = false;
+            if(orgStatusMsg) orgStatusMsg.textContent = "⚠️ Connection failed. Try again.";
+          });
+        }
+      };
+    }
   };
 
   /* ── Pending approval screen ─────────────────────────────── */
@@ -4053,13 +4253,21 @@
 
     if(confirmSignoff) confirmSignoff.onclick = function(){
       var pin = (signoffPin.value || "").trim();
-      if(!checkPin(pin)){
-        signoffError.textContent = "❌ Incorrect PIN. Only the Lead can sign off a handover.";
-        signoffError.style.display = "block";
-        signoffPin.value = "";
-        return;
-      }
-      signoffError.style.display = "none";
+      confirmSignoff.textContent = "Checking…"; confirmSignoff.disabled = true;
+      checkPin(pin, function(ok) {
+        confirmSignoff.textContent = "✍️ Sign & Lock Handover"; confirmSignoff.disabled = false;
+        if(!ok){
+          signoffError.textContent = "❌ Incorrect PIN. Only the Lead can sign off a handover.";
+          signoffError.style.display = "block";
+          signoffPin.value = "";
+          return;
+        }
+        signoffError.style.display = "none";
+        doSignoff();
+      });
+    };
+
+    function doSignoff(){
 
       if(!state.signedHandovers) state.signedHandovers = [];
       var entry = {

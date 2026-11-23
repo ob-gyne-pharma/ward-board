@@ -43,6 +43,7 @@
   <div class="brand">
     <div class="mark">🩺</div>
     <h1 id="appTitle" contenteditable="false" spellcheck="false" title="Double-click to rename">Ward Board</h1>
+    <span id="orgContextLabel" style="font-size:0.72rem;font-weight:600;color:rgba(255,255,255,0.4);margin-left:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px;"></span>
   </div>
   <div class="header-actions">
     <span id="clock"></span>
@@ -518,6 +519,33 @@
   </div>
 </div>
 
+<!-- ══ ORG SELECTION OVERLAY ══ -->
+<div class="overlay" id="orgSelectionOverlay" style="background:rgba(10,18,26,0.97);backdrop-filter:blur(8px);">
+  <div class="modal" style="max-width:480px;margin-top:60px;">
+    <div class="modal-body" style="padding:28px 28px 24px;">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">
+        <div style="width:40px;height:40px;background:linear-gradient(135deg,#0d7a68,#0fb898);border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">🩺</div>
+        <div>
+          <div style="font-size:1.1rem;font-weight:800;color:#fff;">Welcome to Ward Board</div>
+          <div style="font-size:0.8rem;color:rgba(255,255,255,0.5);">Select your hospital and department to continue</div>
+        </div>
+      </div>
+
+      <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:rgba(255,255,255,0.4);margin-bottom:8px;">Select hospital</div>
+      <div id="orgHospitalList" style="margin-bottom:16px;max-height:180px;overflow-y:auto;"></div>
+
+      <div id="orgDeptSection" style="display:none;">
+        <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:rgba(255,255,255,0.4);margin-bottom:8px;">Select department</div>
+        <div id="orgDeptList" style="max-height:180px;overflow-y:auto;margin-bottom:16px;"></div>
+      </div>
+
+      <div id="orgStatusMsg" style="font-size:0.8rem;color:#e05252;margin-bottom:10px;"></div>
+      <button id="orgConfirmBtn" class="btn-primary" style="width:100%;" disabled>Go to ward →</button>
+      <p style="font-size:0.75rem;color:rgba(255,255,255,0.3);margin-top:12px;text-align:center;line-height:1.5;">Your selection is saved — you won't be asked again on this device.<br>Use Lead Panel → Switch Department to change later.</p>
+    </div>
+  </div>
+</div>
+
 <!-- Set Name Modal -->
 <div class="overlay" id="setNameOverlay">
   <div class="modal" style="max-width:380px;">
@@ -774,6 +802,23 @@
       <button class="modal-close" id="closeHodPanel">✕</button>
     </div>
     <div class="modal-body" style="padding:20px 24px;">
+
+      <!-- Section: Organisation -->
+      <div class="hod-section">
+        <div class="hod-section-title">🏥 Organisation</div>
+        <div id="hodOrgContext" style="background:rgba(13,122,104,0.08);border:1px solid rgba(13,122,104,0.2);border-radius:10px;padding:12px 16px;margin-bottom:12px;"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button id="hodSwitchDeptBtn" class="btn-outline" style="flex:1;font-size:0.82rem;">🔀 Switch department</button>
+          <button id="hodChangePinBtn" class="btn-outline" style="flex:1;font-size:0.82rem;">🔐 Change PIN</button>
+        </div>
+      </div>
+
+      <!-- Section: Backup -->
+      <div class="hod-section">
+        <div class="hod-section-title">💾 Backup</div>
+        <p style="font-size:0.82rem;color:var(--ink-soft);margin-bottom:10px;line-height:1.5;">Download a full JSON backup of this department's board state, staff list, and configuration. Keep a copy after each shift.</p>
+        <button id="hodBackupBtn" class="btn-outline" style="width:100%;">💾 Export backup</button>
+      </div>
 
       <!-- Section: Rename -->
       <div class="hod-section">
