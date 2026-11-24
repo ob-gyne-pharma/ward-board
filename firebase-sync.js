@@ -62,29 +62,53 @@ try {
 
   /* ── Step 1: Check if user has a saved hospital + dept preference ── */
   function checkUserProfile(user) {
+    // First check localStorage cache for speed
+    var cachedHospId = localStorage.getItem("wb_hosp_id");
+    var cachedDeptId = localStorage.getItem("wb_dept_id");
+
     const profileRef = ref(db, "users/" + user.uid + "/profile");
     get(profileRef).then(function(snap) {
       const profile = snap.val();
       if(profile && profile.hospitalId && profile.deptId) {
-        // Returning user — go straight to approval check for their dept
         _hospitalId = profile.hospitalId;
         _deptId     = profile.deptId;
+        // Cache locally for speed
+        localStorage.setItem("wb_hosp_id", _hospitalId);
+        localStorage.setItem("wb_dept_id", _deptId);
+        checkApprovalStatus(user);
+      } else if(cachedHospId && cachedDeptId) {
+        // Use localStorage cache if Firebase profile not set yet
+        _hospitalId = cachedHospId;
+        _deptId     = cachedDeptId;
         checkApprovalStatus(user);
       } else {
-        // New user — load hospital list and show org selection screen
+        // New user — load hospital list now that user is authenticated
         loadHospitalsForSelection(user);
       }
     }).catch(function() {
-      loadHospitalsForSelection(user);
+      if(cachedHospId && cachedDeptId) {
+        _hospitalId = cachedHospId;
+        _deptId     = cachedDeptId;
+        checkApprovalStatus(user);
+      } else {
+        loadHospitalsForSelection(user);
+      }
     });
   }
 
   /* ── Step 2a: Load hospital list → show selection screen ── */
   function loadHospitalsForSelection(user) {
+    // User is now authenticated — read hospitals
     get(ref(db, "hospitals")).then(function(snap) {
       const hospitals = snap.val() || {};
-      if(window.showOrgSelection) window.showOrgSelection(user, hospitals);
-    }).catch(function() {
+      if(Object.keys(hospitals).length === 0) {
+        // No hospitals seeded yet — show helpful message
+        if(window.showOrgSelection) window.showOrgSelection(user, {});
+      } else {
+        if(window.showOrgSelection) window.showOrgSelection(user, hospitals);
+      }
+    }).catch(function(err) {
+      console.error("[Firebase] Could not load hospitals:", err);
       if(window.showOrgSelection) window.showOrgSelection(user, {});
     });
   }
@@ -100,11 +124,17 @@ try {
   window.firebaseSetOrgContext = function(user, hospitalId, deptId) {
     _hospitalId = hospitalId;
     _deptId     = deptId;
+    // Cache in localStorage so returning users skip selection instantly
+    localStorage.setItem("wb_hosp_id", hospitalId);
+    localStorage.setItem("wb_dept_id", deptId);
     return set(ref(db, "users/" + user.uid + "/profile"), {
       hospitalId: hospitalId,
       deptId:     deptId,
       updatedAt:  new Date().toISOString()
     }).then(function() {
+      checkApprovalStatus(user);
+    }).catch(function() {
+      // Even if Firebase write fails, proceed with cached values
       checkApprovalStatus(user);
     });
   };
@@ -260,6 +290,8 @@ try {
       if(!user) return Promise.reject("Not signed in");
       _hospitalId = hospitalId;
       _deptId     = deptId;
+      localStorage.setItem("wb_hosp_id", hospitalId);
+      localStorage.setItem("wb_dept_id", deptId);
       return set(ref(db, "users/" + user.uid + "/profile"), {
         hospitalId: hospitalId,
         deptId: deptId,

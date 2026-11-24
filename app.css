@@ -1018,3 +1018,153 @@
 #qrCodeContainer img {
   border-radius: 8px;
 }
+
+/* ══ THEME B — CLINICAL LIGHT (default) ═══════════════════════
+   Override OS dark-mode preference — user must manually toggle.
+   This removes the auto-dark-on-OS-preference behaviour.        */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="dark"]) {
+    --ink:       #0f1923; --ink-2: #2d3d4a; --ink-soft: #56687a; --ink-mute: #8da0ae;
+    --line:      #dde3e8; --line-soft: #edf1f4; --paper: #f4f6f8; --card: #ffffff;
+    --header-bg: #0f1923; --header-2: #192330;
+    --accent: #0d7a68; --accent-mid: #0a6657; --accent-soft: #e0f4f1; --accent-pale: #f0faf8;
+    --red: #c0291f; --red-soft: #fdf0ef; --red-mid: #e8aeab;
+    --amber: #9e5f06; --amber-soft: #fdf5e6; --amber-mid: #f0ce8a;
+    --blue: #1a5fa8; --blue-soft: #eaf2fb;
+    --purple: #6243a0; --purple-soft: #f2edfb;
+    --gynae: #b05410; --gynae-soft: #fdf0e5;
+  }
+}
+
+/* ══ GRID FIX — no overflow on narrow phones ══ */
+#grid {
+  grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
+}
+.room-group {
+  grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
+}
+
+/* ══ ROLE BADGE ══ */
+#roleBadge {
+  font-size: 0.65rem; font-weight: 700; padding: 3px 10px;
+  border-radius: 100px; background: rgba(255,255,255,0.1);
+  color: rgba(255,255,255,0.7); white-space: nowrap;
+  display: none;
+}
+
+/* ══ NOTIFICATION BELL ══ */
+#notifBell {
+  position: relative; background: rgba(255,255,255,0.09);
+  color: rgba(255,255,255,0.88); border: 1px solid rgba(255,255,255,0.12);
+  border-radius: var(--r-sm); padding: 7px 10px; font-size: 1rem;
+  min-width: 44px; min-height: 44px; display: flex; align-items: center; justify-content: center;
+}
+#notifBadge {
+  position: absolute; top: -4px; right: -4px;
+  background: var(--red); color: #fff; font-size: 0.6rem; font-weight: 800;
+  min-width: 16px; height: 16px; border-radius: 8px; padding: 0 3px;
+  display: flex; align-items: center; justify-content: center;
+  border: 2px solid var(--header-bg);
+}
+
+/* ══ MOBILE BOTTOM NAVIGATION ══ */
+#mobileBottomNav {
+  display: none;
+  position: fixed; bottom: 0; left: 0; right: 0;
+  padding-bottom: env(safe-area-inset-bottom);
+  background: var(--card); border-top: 1px solid var(--line);
+  z-index: 30; height: calc(60px + env(safe-area-inset-bottom));
+}
+.mobile-nav-items {
+  display: flex; height: 60px;
+  align-items: center; justify-content: space-around;
+}
+.mobile-nav-item {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 3px; padding: 8px 4px;
+  cursor: pointer; min-height: 44px; border: none; background: none;
+  color: var(--ink-mute); font-size: 0.6rem; font-weight: 600;
+  letter-spacing: 0.03em; text-transform: uppercase; border-radius: 0;
+  transition: color 0.15s;
+}
+.mobile-nav-item .nav-icon { font-size: 1.3rem; line-height: 1; }
+.mobile-nav-item.active { color: var(--accent); }
+.mobile-nav-item:active { transform: scale(0.92); }
+
+@media (max-width: 640px) {
+  #mobileBottomNav { display: block; }
+  /* Push content up so bottom nav doesn't cover it */
+  body { padding-bottom: calc(60px + env(safe-area-inset-bottom) + 16px) !important; }
+  /* Mobile filter toggle */
+  #mobileFilterToggle {
+    display: flex; align-items: center; gap: 6px;
+    padding: 7px 12px; border-radius: var(--r-sm);
+    background: var(--paper); border: 1px solid var(--line);
+    color: var(--ink-soft); font-size: 0.78rem; font-weight: 600;
+    min-height: 44px; cursor: pointer;
+  }
+  /* Min tap target for all interactive elements */
+  button, .ward-tab, .room-pill, .pill, .flag, .overflow-item, .nav-item {
+    min-height: 44px;
+  }
+  .pill { padding: 8px 12px; }
+}
+
+@media (min-width: 641px) {
+  #mobileFilterToggle { display: none; }
+  #mobileBottomNav { display: none !important; }
+}
+
+/* ══ COMPACT LIST VIEW ══ */
+#grid.list-view {
+  grid-template-columns: 1fr !important;
+  gap: 6px;
+}
+#grid.list-view .room-group {
+  grid-template-columns: 1fr !important;
+}
+#grid.list-view .bed-card {
+  flex-direction: row; align-items: center; padding: 0;
+  border-radius: 10px; min-height: 56px;
+}
+#grid.list-view .bed-card::before {
+  width: 4px; height: 100%; flex-shrink: 0; border-radius: 10px 0 0 10px;
+}
+#grid.list-view .bed-top { padding: 10px 12px; flex: 0 0 auto; }
+#grid.list-view .bed-body {
+  flex: 1; flex-direction: row; align-items: center;
+  padding: 8px 12px; gap: 12px; overflow: hidden;
+}
+#grid.list-view .patient-name-row { flex-wrap: nowrap; }
+#grid.list-view .field:not(:first-child) { display: none; }
+#grid.list-view .field:first-child { flex: 1; min-width: 0; }
+#grid.list-view .field:first-child .value {
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#grid.list-view .flags { display: none; }
+#grid.list-view .checklist-display { display: none; }
+#grid.list-view .bed-actions { flex-shrink: 0; }
+#grid.list-view .empty-state { padding: 10px 14px; flex-direction: row; justify-content: flex-start; }
+
+/* View toggle buttons */
+#listViewBtn, #gridViewBtn {
+  padding: 6px 10px; font-size: 0.78rem; border-radius: var(--r-sm);
+  border: 1px solid var(--line); background: var(--card); color: var(--ink-soft);
+  cursor: pointer; min-height: 36px;
+}
+
+/* ══ NOTIFICATION PANEL ══ */
+#notifPanelOverlay .modal {
+  max-width: 420px;
+}
+#notifPanelBody {
+  max-height: 60vh; overflow-y: auto;
+}
+
+/* ══ ADMISSION LOCK INDICATOR ══ */
+.ward-lock-badge {
+  font-size: 0.65rem; font-weight: 700; padding: 2px 8px;
+  border-radius: 100px; margin-left: 8px;
+}
+.ward-lock-hard { background: var(--red-soft); color: var(--red); border: 1px solid var(--red-mid); }
+.ward-lock-soft { background: var(--amber-soft); color: var(--amber); border: 1px solid var(--amber-mid); }

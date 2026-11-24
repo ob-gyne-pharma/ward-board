@@ -47,8 +47,14 @@
   </div>
   <div class="header-actions">
     <span id="clock"></span>
+    <span id="orgContextLabel" style="font-size:0.65rem;color:rgba(255,255,255,0.35);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px;display:none;"></span>
+    <span id="roleBadge"></span>
     <!-- Cloud status dot -->
     <span id="cloudDot" title="Sync status" style="width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,0.25);display:inline-block;flex-shrink:0;transition:background 0.4s;"></span>
+    <!-- Notification bell -->
+    <button id="notifBell" aria-label="Notifications" title="Notifications">
+      🔔<span id="notifBadge" style="display:none;"></span>
+    </button>
     <button class="btn-ghost btn-small" id="staffNameBtn" style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">👤 Sign in</button>
     <button class="btn-ghost btn-small btn-hod" id="hodBtn">🔑 Lead</button>
     <!-- Overflow menu -->
@@ -168,7 +174,12 @@
       <button class="view-btn active" id="viewFull" title="Full view">▤ Full</button>
       <button class="view-btn" id="viewCompact" title="Compact view">▦ Compact</button>
     </div>
+    <!-- List / Grid view toggle -->
+    <button id="listViewBtn" title="List view">☰ List</button>
+    <button id="gridViewBtn" title="Grid view">⊞ Grid</button>
     <button class="btn-round-timer" id="roundTimerBtn" title="Ward round timer">⏱ Start round</button>
+    <!-- Mobile: filter toggle -->
+    <button id="mobileFilterToggle" title="Filters">⚙️ Filter</button>
   </div>
   <div class="filter-row">
     <select id="unitFilter">
@@ -889,7 +900,17 @@
       <!-- Section: Ward management -->
       <div class="hod-section">
         <div class="hod-section-title">🏥 Ward management</div>
-        <div id="hod_wardDeleteList" style="display:flex;flex-direction:column;gap:6px;"></div>
+        <div id="hod_wardDeleteList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px;"></div>
+        <!-- Admission lock per ward -->
+        <div style="background:var(--paper);border-radius:10px;padding:12px 14px;border:1px solid var(--line);">
+          <div style="font-size:0.8rem;font-weight:600;color:var(--ink);margin-bottom:6px;">🔒 Admission / discharge lock — current ward</div>
+          <p style="font-size:0.78rem;color:var(--ink-soft);margin-bottom:10px;line-height:1.5;">Control who can admit or discharge patients in the active ward.</p>
+          <select id="wardAdmissionLock" style="width:100%;">
+            <option value="none">🔓 No lock — anyone can admit / discharge</option>
+            <option value="soft">🟡 Soft lock — anyone can save but Consultant is alerted</option>
+            <option value="hard">🔴 Hard lock — Consultant or above required</option>
+          </select>
+        </div>
       </div>
 
       <!-- Section: Data backup & restore -->
@@ -1143,5 +1164,53 @@
       });
     }
   </script>
+<!-- ══ MOBILE BOTTOM NAVIGATION ══ -->
+<nav id="mobileBottomNav" role="navigation" aria-label="Main navigation">
+  <div class="mobile-nav-items">
+    <button class="mobile-nav-item active" data-target="board">
+      <span class="nav-icon">🏥</span>Board
+    </button>
+    <button class="mobile-nav-item" data-target="theatre">
+      <span class="nav-icon">🔪</span>Theatre
+    </button>
+    <button class="mobile-nav-item" data-target="handover">
+      <span class="nav-icon">📋</span>Handover
+    </button>
+    <button class="mobile-nav-item" data-target="notif">
+      <span class="nav-icon">🔔</span>Alerts
+    </button>
+    <button class="mobile-nav-item" data-target="profile">
+      <span class="nav-icon">👤</span>Me
+    </button>
+  </div>
+</nav>
+
+<!-- ══ NOTIFICATION HISTORY PANEL ══ -->
+<div class="overlay" id="notifPanelOverlay">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-swipe-bar"></div>
+    <div class="modal-head">
+      <h2>🔔 Notifications</h2>
+      <div style="display:flex;gap:8px;align-items:center;margin-left:auto;">
+        <button id="notifSettingsBtn" class="btn-outline btn-small">⚙️ Settings</button>
+        <button class="modal-close" id="closeNotifPanel">✕</button>
+      </div>
+    </div>
+    <div class="modal-body" style="padding:0;" id="notifPanelBody"></div>
+  </div>
+</div>
+
+<!-- ══ NOTIFICATION SETTINGS OVERLAY ══ -->
+<div class="overlay" id="notifSettingsOverlay">
+  <div class="modal" style="max-width:440px;">
+    <div class="modal-swipe-bar"></div>
+    <div class="modal-head">
+      <h2>⚙️ Notification settings</h2>
+      <button class="modal-close" id="closeNotifSettings">✕</button>
+    </div>
+    <div class="modal-body" style="padding:0;max-height:70vh;overflow-y:auto;" id="notifSettingsBody"></div>
+  </div>
+</div>
+
 </body>
 </html>
