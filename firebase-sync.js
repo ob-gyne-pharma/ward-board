@@ -145,67 +145,116 @@ try {
   };
 
   /* ── Step 3: Check approval at dept level ── */
-  function checkApprovalStatus(user) {
+  function checkApprovalStatus(user, attempt) {
+    attempt = attempt || 1;
+
+    // Hide the board while we verify — show a neutral loading state
+    var appContent = document.getElementById("appContent");
+    if(appContent && attempt === 1) appContent.style.display = "none";
+
     const staffRef = ref(db, "hospitals/" + _hospitalId + "/depts/" + _deptId + "/staff/" + user.uid);
     get(staffRef).then(function(snap) {
       const data = snap.val();
+
       if(data && data.status === "approved") {
+        // ✅ Approved — show board
         if(window.onAuthReady) window.onAuthReady(user, data);
         startDatabaseSync(user);
+
       } else if(data && (data.status === "rejected" || data.status === "inactive")) {
+        // ❌ Rejected
         signOut(auth);
         if(window.showLoginModal) window.showLoginModal();
         if(window.showAuthError) window.showAuthError("Your access was not approved for this department.");
-      } else {
-        // Register as pending if not yet known
-        if(!data) {
-          var newStaffName = user.displayName || user.email.split("@")[0];
-          set(staffRef, {
-            uid: user.uid,
-            name: newStaffName,
-            email: user.email,
-            status: "pending",
-            role: "staff",
-            requestedAt: new Date().toISOString(),
-            hospitalId: _hospitalId,
-            deptId: _deptId
-          });
-          // ── Notification trigger — tell dept lead a new staff member is waiting ──
+
+      } else if(!data) {
+        // 🆕 Brand new user — no record yet — register as pending
+        var newStaffName = user.displayName || user.email.split("@")[0];
+        set(staffRef, {
+          uid: user.uid,
+          name: newStaffName,
+          email: user.email,
+          status: "pending",
+          role: "staff",
+          requestedAt: new Date().toISOString(),
+          hospitalId: _hospitalId,
+          deptId: _deptId
+        }).then(function() {
+          // Fire notification to alert dept lead
           if(window.fireNotif) window.fireNotif(
             "staffApproval",
             "New staff awaiting approval",
             newStaffName + " (" + user.email + ") has requested access",
             {}
           );
-        }
+        });
         if(window.showPendingScreen) window.showPendingScreen(user);
         if(statusEl) statusEl.textContent = "⏳ Awaiting approval";
-        // Poll for approval
-        var poll = setInterval(function() {
-          get(staffRef).then(function(s) {
-            var d = s.val();
-            if(d && d.status === "approved") {
-              clearInterval(poll);
-              if(window.onAuthReady) window.onAuthReady(user, d);
-              startDatabaseSync(user);
-            } else if(d && (d.status === "rejected" || d.status === "inactive")) {
-              clearInterval(poll);
-              signOut(auth);
-              if(window.showLoginModal) window.showLoginModal();
-              if(window.showAuthError) window.showAuthError("Your access request was not approved.");
-            }
-          });
-        }, 8000);
-        window._approvalPoll = poll;
+        startApprovalPoll(user, staffRef);
+
+      } else {
+        // ⏳ Record exists but status is pending
+        if(window.showPendingScreen) window.showPendingScreen(user);
+        if(statusEl) statusEl.textContent = "⏳ Awaiting approval";
+        startApprovalPoll(user, staffRef);
       }
+
     }).catch(function(err) {
-      console.error("Approval check error:", err);
-      if(window.showPendingScreen) window.showPendingScreen(user);
+      console.error("[Approval] Read failed (attempt " + attempt + "):", err.code, err.message);
+
+      if(attempt < 4) {
+        // Retry — transient Firebase error or rules race condition
+        setTimeout(function() {
+          checkApprovalStatus(user, attempt + 1);
+        }, 1000 * attempt);
+      } else {
+        // After 4 attempts, check localStorage for a known-approved flag
+        var knownApproved = localStorage.getItem("wb_approved_" + user.uid);
+        if(knownApproved === "1") {
+          // Trust the cache — start the board with a minimal data object
+          console.warn("[Approval] Using cached approval status for", user.uid);
+          if(window.onAuthReady) window.onAuthReady(user, { role: localStorage.getItem("wb_role_" + user.uid) || "staff", status: "approved" });
+          startDatabaseSync(user);
+        } else {
+          // Unknown state — show pending screen, don't lock them out permanently
+          if(window.showPendingScreen) window.showPendingScreen(user);
+          if(statusEl) statusEl.textContent = "⚠️ Connection issue — retrying…";
+          // Keep retrying silently every 10s
+          setTimeout(function() { checkApprovalStatus(user, 1); }, 10000);
+        }
+      }
     });
+  }
+
+  function startApprovalPoll(user, staffRef) {
+    if(window._approvalPoll) clearInterval(window._approvalPoll);
+    var poll = setInterval(function() {
+      get(staffRef).then(function(s) {
+        var d = s.val();
+        if(d && d.status === "approved") {
+          clearInterval(poll);
+          window._approvalPoll = null;
+          localStorage.setItem("wb_approved_" + user.uid, "1");
+          localStorage.setItem("wb_role_" + user.uid, d.role || "staff");
+          if(window.onAuthReady) window.onAuthReady(user, d);
+          startDatabaseSync(user);
+        } else if(d && (d.status === "rejected" || d.status === "inactive")) {
+          clearInterval(poll);
+          window._approvalPoll = null;
+          signOut(auth);
+          if(window.showLoginModal) window.showLoginModal();
+          if(window.showAuthError) window.showAuthError("Your access request was not approved.");
+        }
+      }).catch(function() { /* silent — keep polling */ });
+    }, 8000);
+    window._approvalPoll = poll;
   }
 
   /* ── Step 4: Start syncing the ward board for this dept ── */
   function startDatabaseSync(user) {
+    // Cache approval so we survive transient read failures next time
+    localStorage.setItem("wb_approved_" + user.uid, "1");
+
     if(_unsubBoard) _unsubBoard(); // Detach any old listener
     _boardRef = ref(db, "hospitals/" + _hospitalId + "/depts/" + _deptId + "/boardState");
 
@@ -249,7 +298,15 @@ try {
     signIn:            function(e,p){ return signInWithEmailAndPassword(auth,e,p); },
     signInWithGoogle:  function(){ return signInWithPopup(auth, provider); },
     register:          function(e,p,n){ return createUserWithEmailAndPassword(auth,e,p).then(function(c){ return updateProfile(c.user,{displayName:n}).then(function(){ return c; }); }); },
-    signOut:           function(){ if(window._approvalPoll) clearInterval(window._approvalPoll); return signOut(auth); },
+    signOut:           function(){
+      if(window._approvalPoll) clearInterval(window._approvalPoll);
+      var uid = auth.currentUser ? auth.currentUser.uid : null;
+      if(uid) {
+        localStorage.removeItem("wb_approved_" + uid);
+        localStorage.removeItem("wb_role_" + uid);
+      }
+      return signOut(auth);
+    },
     currentUser:       function(){ return auth.currentUser; },
     updateDisplayName: function(n){ return auth.currentUser ? updateProfile(auth.currentUser,{displayName:n}) : Promise.reject("Not signed in"); },
     resetPassword:     function(e){ return sendPasswordResetEmail(auth,e); },

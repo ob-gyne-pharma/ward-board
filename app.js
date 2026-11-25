@@ -932,6 +932,12 @@
     });
     var appContent = document.getElementById("appContent");
     if(appContent) appContent.style.display = "block";
+
+    // Cache role for resilience against transient Firebase read failures
+    if(data && data.role) {
+      localStorage.setItem("wb_role_" + user.uid, data.role);
+      localStorage.setItem("wb_approved_" + user.uid, "1");
+    }
     // Sync display name
     var displayName = user.displayName || user.email.split("@")[0];
     setStaffName(displayName);
