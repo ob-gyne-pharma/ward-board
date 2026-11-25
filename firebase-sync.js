@@ -97,19 +97,24 @@ try {
   }
 
   /* ── Step 2a: Load hospital list → show selection screen ── */
-  function loadHospitalsForSelection(user) {
-    // User is now authenticated — read hospitals
+  function loadHospitalsForSelection(user, attempt) {
+    attempt = attempt || 1;
+    // Show org selection immediately with loading state
+    if(attempt === 1 && window.showOrgSelection) {
+      window.showOrgSelection(user, null); // null = loading state
+    }
     get(ref(db, "hospitals")).then(function(snap) {
       const hospitals = snap.val() || {};
-      if(Object.keys(hospitals).length === 0) {
-        // No hospitals seeded yet — show helpful message
-        if(window.showOrgSelection) window.showOrgSelection(user, {});
-      } else {
-        if(window.showOrgSelection) window.showOrgSelection(user, hospitals);
-      }
+      if(window.showOrgSelection) window.showOrgSelection(user, hospitals);
     }).catch(function(err) {
-      console.error("[Firebase] Could not load hospitals:", err);
-      if(window.showOrgSelection) window.showOrgSelection(user, {});
+      console.error("[Firebase] Could not load hospitals (attempt " + attempt + "):", err);
+      if(attempt < 3) {
+        // Retry after delay — auth token may not be ready yet
+        setTimeout(function() { loadHospitalsForSelection(user, attempt + 1); }, 1500 * attempt);
+      } else {
+        // Show empty with error message after 3 attempts
+        if(window.showOrgSelection) window.showOrgSelection(user, {}, "Could not load hospital list. Check your connection and try signing out and back in.");
+      }
     });
   }
 
@@ -154,9 +159,10 @@ try {
       } else {
         // Register as pending if not yet known
         if(!data) {
+          var newStaffName = user.displayName || user.email.split("@")[0];
           set(staffRef, {
             uid: user.uid,
-            name: user.displayName || user.email.split("@")[0],
+            name: newStaffName,
             email: user.email,
             status: "pending",
             role: "staff",
@@ -164,6 +170,13 @@ try {
             hospitalId: _hospitalId,
             deptId: _deptId
           });
+          // ── Notification trigger — tell dept lead a new staff member is waiting ──
+          if(window.fireNotif) window.fireNotif(
+            "staffApproval",
+            "New staff awaiting approval",
+            newStaffName + " (" + user.email + ") has requested access",
+            {}
+          );
         }
         if(window.showPendingScreen) window.showPendingScreen(user);
         if(statusEl) statusEl.textContent = "⏳ Awaiting approval";

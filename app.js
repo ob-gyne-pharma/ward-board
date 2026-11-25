@@ -963,7 +963,7 @@
   };
 
   /* ── Org Selection Screen ── */
-  window.showOrgSelection = function(user, hospitals) {
+  window.showOrgSelection = function(user, hospitals, errorMsg) {
     if(window._hideLoading) window._hideLoading();
     var appContent = document.getElementById("appContent");
     if(appContent) appContent.style.display = "none";
@@ -980,6 +980,18 @@
     var selectedHospId = null, selectedDeptId = null;
 
     if(!hospList) return;
+
+    // Loading state
+    if(hospitals === null) {
+      hospList.innerHTML = '<p style="color:rgba(255,255,255,0.4);font-size:0.85rem;padding:12px 0;">⏳ Loading hospitals…</p>';
+      return;
+    }
+
+    // Error state
+    if(errorMsg) {
+      hospList.innerHTML = '<p style="color:#e05252;font-size:0.82rem;padding:12px 0;">⚠️ ' + escapeHtml(errorMsg) + '</p>';
+      return;
+    }
 
     // Render hospitals
     var hospKeys = Object.keys(hospitals);
@@ -2301,12 +2313,16 @@
 
     var moreMenu = document.createElement("div");
     moreMenu.style.cssText = "display:none;position:absolute;bottom:calc(100% + 6px);right:0;background:var(--card);border:1px solid var(--line);border-radius:var(--r-md);box-shadow:0 8px 24px rgba(0,0,0,0.15);min-width:160px;z-index:50;overflow:hidden;";
+    var isWatched = state.patientWatches && state.patientWatches[activeWardId+"_"+room+bed];
+    var isMuted   = state.patientMutes   && state.patientMutes[activeWardId+"_"+room+bed];
     moreMenu.innerHTML =
       '<button class="overflow-item" id="moreEdit_'+room+bed+'">✏️ Edit patient</button>' +
       '<button class="overflow-item" id="moreTx_'+room+bed+'">🔀 Transfer</button>' +
       '<button class="overflow-item" id="moreShare_'+room+bed+'">📤 Share summary</button>' +
       '<button class="overflow-item" id="morePrint_'+room+bed+'">🖨️ Print card</button>' +
       '<button class="overflow-item" id="moreQR_'+room+bed+'">📱 QR code for bed</button>' +
+      '<button class="overflow-item" id="moreWatch_'+room+bed+'">'+(isWatched?"🔕 Stop watching":"🔔 Watch this patient")+'</button>' +
+      '<button class="overflow-item" id="moreMute_'+room+bed+'">'+(isMuted?"🔔 Unmute notifications":"🔕 Mute notifications")+'</button>' +
       '<div class="overflow-divider"></div>' +
       '<button class="overflow-item" style="color:var(--red);" id="moreDisch_'+room+bed+'">↩ Discharge</button>';
 
@@ -2341,6 +2357,10 @@
       if(pBtn) pBtn.onclick = function(){ moreMenu.style.display="none"; printPatientCard(room, bed); };
       if(dBtn) dBtn.onclick = function(){ moreMenu.style.display="none"; openDischargeSummary(room, bed); };
       if(qBtn) qBtn.onclick = function(){ moreMenu.style.display="none"; openQRModal(room, bed); };
+      var wBtn  = document.getElementById("moreWatch_"+room+bed);
+      var muBtn = document.getElementById("moreMute_"+room+bed);
+      if(wBtn)  wBtn.onclick  = function(){ moreMenu.style.display="none"; if(window.togglePatientWatch) window.togglePatientWatch(activeWardId, room+bed); };
+      if(muBtn) muBtn.onclick = function(){ moreMenu.style.display="none"; if(window.togglePatientMute)  window.togglePatientMute(activeWardId, room+bed); };
     }, 0);
 
     moreWrap.appendChild(moreBtn);
@@ -2542,11 +2562,46 @@
       };
 
       var isNew = !existing;
+      var newAcuity = w.rooms[key].acuity;
+      var oldAcuity = existing ? existing.acuity : null;
+      var patientName = w.rooms[key].name || key;
+      var wardName = currentWard().name;
+
       hodLog(isNew ? "admit" : "edit",
-        (isNew ? "Admitted: " : "Updated: ") + (w.rooms[key].name || key) +
+        (isNew ? "Admitted: " : "Updated: ") + patientName +
         (w.rooms[key].diagnosis ? " — " + w.rooms[key].diagnosis : ""),
-        currentWard().name
+        wardName
       );
+
+      // ── Notification triggers ──
+      if(isNew) {
+        // New admission
+        if(window.fireNotif) window.fireNotif(
+          "admitDischarge",
+          "New admission — " + wardName,
+          patientName + (w.rooms[key].diagnosis ? " · " + w.rooms[key].diagnosis : ""),
+          { wardId: activeWardId, bedKey: key, wardName: wardName }
+        );
+      } else if(oldAcuity && newAcuity !== oldAcuity) {
+        // Acuity changed
+        var acuityLabel = { stable:"🟢 Stable", review:"🟡 Needs Review", urgent:"🔴 Urgent" };
+        if(newAcuity === "urgent") {
+          if(window.fireNotif) window.fireNotif(
+            "urgentAll",
+            "🚨 URGENT — " + patientName,
+            wardName + " · " + (w.rooms[key].diagnosis || ""),
+            { wardId: activeWardId, bedKey: key, wardName: wardName }
+          );
+        } else {
+          if(window.fireNotif) window.fireNotif(
+            "acuityChange",
+            "Acuity change — " + patientName,
+            (acuityLabel[oldAcuity]||oldAcuity) + " → " + (acuityLabel[newAcuity]||newAcuity) + " · " + wardName,
+            { wardId: activeWardId, bedKey: key, wardName: wardName }
+          );
+        }
+      }
+
       var _pr = currentBedForModal.room, _pb = currentBedForModal.bed;
       saveState();
       closePatientModal();
@@ -2631,18 +2686,42 @@
         nextReview: buildReviewISO((document.getElementById("p_nextReview")||{}).value||"", (document.getElementById("p_nextReviewDay")||{}).value||"today"),
         updatedBy: staffName
       };
+      var oldProgressAcuity = patient.acuity;
       patient.acuity = progressAcuity;
       patient.lastUpdated = entry.time;
       patient.lastUpdatedBy = staffName;
       if(!patient.history) patient.history = [];
       patient.history.push(entry);
+      var progressWardName = currentWard().name;
+      var progressPatientName = patient.name || (currentBedForProgress.room + currentBedForProgress.bed);
       hodLog("progress",
-        (patient.name || currentBedForProgress.room + currentBedForProgress.bed) +
+        progressPatientName +
         " — " + progressAcuity +
         (entry.situation ? " | " + entry.situation.slice(0,80) : "") +
         (entry.plan ? " | Plan: " + entry.plan.slice(0,60) : ""),
-        currentWard().name
+        progressWardName
       );
+
+      // ── Notification triggers ──
+      if(oldProgressAcuity !== progressAcuity && window.fireNotif) {
+        var acuityLabel2 = { stable:"🟢 Stable", review:"🟡 Needs Review", urgent:"🔴 Urgent" };
+        if(progressAcuity === "urgent") {
+          window.fireNotif(
+            "urgentAll",
+            "🚨 URGENT — " + progressPatientName,
+            progressWardName + (entry.situation ? " · " + entry.situation.slice(0,60) : ""),
+            { wardId: activeWardId, bedKey: bedKey(currentBedForProgress.room, currentBedForProgress.bed), wardName: progressWardName }
+          );
+        } else {
+          window.fireNotif(
+            "acuityChange",
+            "Acuity change — " + progressPatientName,
+            (acuityLabel2[oldProgressAcuity]||oldProgressAcuity) + " → " + (acuityLabel2[progressAcuity]||progressAcuity) + " · " + progressWardName,
+            { wardId: activeWardId, bedKey: bedKey(currentBedForProgress.room, currentBedForProgress.bed), wardName: progressWardName }
+          );
+        }
+      }
+
       saveState();
       var _flashRoom = currentBedForProgress.room, _flashBed = currentBedForProgress.bed;
       closeProgressModal();
@@ -3111,8 +3190,19 @@
   document.getElementById("confirmDischargeBtn").onclick = function(){
     if(!_pendingDischarge) return;
     var room = _pendingDischarge.room, bed = _pendingDischarge.bed;
-    var dischargedName = (currentWard().rooms[bedKey(room,bed)]||{}).name || (room+bed);
-    hodLog("discharge","Discharged: "+dischargedName+" from "+room+bed, currentWard().name);
+    var dischargedPatient = currentWard().rooms[bedKey(room,bed)] || {};
+    var dischargedName = dischargedPatient.name || (room+bed);
+    var dischargedWard  = currentWard().name;
+    hodLog("discharge","Discharged: "+dischargedName+" from "+room+bed, dischargedWard);
+
+    // ── Notification trigger ──
+    if(window.fireNotif) window.fireNotif(
+      "admitDischarge",
+      "Patient discharged — " + dischargedWard,
+      dischargedName + " · Bed " + room + bed,
+      { wardId: activeWardId, bedKey: bedKey(room,bed), wardName: dischargedWard }
+    );
+
     delete currentWard().rooms[bedKey(room,bed)];
     saveState();
     document.getElementById("dischargeSummaryOverlay").classList.remove("show");
@@ -4284,6 +4374,15 @@
       if(state.signedHandovers.length > 60) state.signedHandovers = state.signedHandovers.slice(0, 60);
 
       hodLog("handover", "Signed handover — " + entry.ward + " · " + entry.signedBy, entry.ward);
+
+      // ── Notification trigger ──
+      if(window.fireNotif) window.fireNotif(
+        "handoverSigned",
+        "Handover signed — " + entry.ward,
+        "Signed by " + entry.signedBy + " · " + fmtTime(entry.signedAt),
+        { wardName: entry.ward }
+      );
+
       saveState();
       signoffOverlay.classList.remove("show");
 
