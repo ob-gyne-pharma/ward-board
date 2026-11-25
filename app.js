@@ -1293,9 +1293,10 @@
   }
 
   // Google sign-in button
-  document.getElementById("authGoogleBtn").onclick = function(){
+  var _googleBtn = document.getElementById("googleSignInBtn") || document.getElementById("authGoogleBtn");
+  if(_googleBtn) _googleBtn.onclick = function(){
     clearAuthError();
-    var btn = document.getElementById("authGoogleBtn");
+    var btn = _googleBtn;
     btn.textContent = "Signing in…"; btn.disabled = true;
     if(!window.firebaseAuth){ btn.textContent="Not ready"; btn.disabled=false; return; }
     window.firebaseAuth.signInWithGoogle().catch(function(err){
