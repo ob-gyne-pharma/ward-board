@@ -218,10 +218,10 @@
   }
   document.getElementById("closeHodPinModal").onclick = closeHodPin;
   document.getElementById("cancelHodPin").onclick    = closeHodPin;
-  document.getElementById("hodPinInput").addEventListener("keydown", function(e){
+  var _safeEl1 = document.getElementById("hodPinInput"); if(_safeEl1) _safeEl1.addEventListener("keydown", function(e){
     if(e.key==="Enter") document.getElementById("submitHodPin").click();
   });
-  document.getElementById("submitHodPin").onclick = function(){
+  var _safeEl2 = document.getElementById("submitHodPin"); if(_safeEl2) _safeEl2.onclick = function(){
     var pin = (document.getElementById("hodPinInput").value || "").trim();
     var err = document.getElementById("hodPinError");
     if(!pin){ err.textContent="Please enter the PIN."; err.style.display="block"; return; }
@@ -253,11 +253,11 @@
     ov.classList.add("show");
   }
 
-  document.getElementById("closeHodPanel").onclick  = function(){ document.getElementById("hodPanelOverlay").classList.remove("show"); };
+  var _safeEl3 = document.getElementById("closeHodPanel"); if(_safeEl3) _safeEl3.onclick = function(){ document.getElementById("hodPanelOverlay").classList.remove("show"); };
   document.getElementById("hod_lockBtn").onclick    = lockHod;
 
   /* Save app title */
-  document.getElementById("hod_saveTitle").onclick = function(){
+  var _safeEl4 = document.getElementById("hod_saveTitle"); if(_safeEl4) _safeEl4.onclick = function(){
     var val = (document.getElementById("hod_appTitle").value || "").trim() || "Ward Board";
     state.appTitle = val;
     var el = document.getElementById("appTitle");
@@ -324,7 +324,7 @@
     });
   }
 
-  document.getElementById("hod_addConsultant").onclick = function(){
+  var _safeEl5 = document.getElementById("hod_addConsultant"); if(_safeEl5) _safeEl5.onclick = function(){
     var inp = document.getElementById("hod_newConsultant");
     var val = (inp.value||"").trim();
     if(!val) return;
@@ -334,7 +334,7 @@
     saveState();
     renderHodConsultantList();
   };
-  document.getElementById("hod_newConsultant").addEventListener("keydown", function(e){
+  var _safeEl6 = document.getElementById("hod_newConsultant"); if(_safeEl6) _safeEl6.addEventListener("keydown", function(e){
     if(e.key==="Enter") document.getElementById("hod_addConsultant").click();
   });
 
@@ -445,11 +445,11 @@
   }
 
   // Re-render history when filters change
-  document.getElementById("hod_histWard").addEventListener("change", renderHodHistory);
-  document.getElementById("hod_histType").addEventListener("change", renderHodHistory);
+  var _safeEl7 = document.getElementById("hod_histWard"); if(_safeEl7) _safeEl7.addEventListener("change", renderHodHistory);
+  var _safeEl8 = document.getElementById("hod_histType"); if(_safeEl8) _safeEl8.addEventListener("change", renderHodHistory);
 
   /* Change PIN */
-  document.getElementById("hod_savePin").onclick = function(){
+  var _safeEl9 = document.getElementById("hod_savePin"); if(_safeEl9) _safeEl9.onclick = function(){
     var np  = (document.getElementById("hod_newPin").value  ||"").trim();
     var cp  = (document.getElementById("hod_confirmPin").value||"").trim();
     var msg = document.getElementById("hod_pinMsg");
@@ -579,8 +579,8 @@
     if(cb){ cb.classList.toggle("active", v==="compact"); }
   }
   applyView(localStorage.getItem(VIEW_KEY)||"full");
-  document.getElementById("viewFull").onclick    = function(){ applyView("full"); };
-  document.getElementById("viewCompact").onclick = function(){ applyView("compact"); };
+  var _safeEl10 = document.getElementById("viewFull"); if(_safeEl10) _safeEl10.onclick = function(){ applyView("full"); };
+  var _safeEl11 = document.getElementById("viewCompact"); if(_safeEl11) _safeEl11.onclick = function(){ applyView("compact"); };
 
   /* ============================================================
      WARD TAB FADE TRANSITION
@@ -666,12 +666,12 @@
       escapeHtml(user.email||"");
   };
 
-  document.getElementById("pendingSignOutBtn").onclick = function(){
+  var _safeEl12 = document.getElementById("pendingSignOutBtn"); if(_safeEl12) _safeEl12.onclick = function(){
     if(window.firebaseAuth) window.firebaseAuth.signOut().then(function(){
       document.getElementById("pendingOverlay").classList.remove("show");
     });
   };
-  document.getElementById("pendingRefreshBtn").onclick = function(){
+  var _safeEl13 = document.getElementById("pendingRefreshBtn"); if(_safeEl13) _safeEl13.onclick = function(){
     // Force a page reload to re-trigger auth state check
     location.reload();
   };
@@ -1075,9 +1075,10 @@
   }
 
   // Google sign-in button
-  document.getElementById("authGoogleBtn").onclick = function(){
+  var _gBtn = document.getElementById("googleSignInBtn") || document.getElementById("authGoogleBtn");
+  if(_gBtn) _gBtn.onclick = function(){
     clearAuthError();
-    var btn = document.getElementById("authGoogleBtn");
+    var btn = _gBtn;
     btn.textContent = "Signing in…"; btn.disabled = true;
     if(!window.firebaseAuth){ btn.textContent="Not ready"; btn.disabled=false; return; }
     window.firebaseAuth.signInWithGoogle().catch(function(err){
@@ -1089,11 +1090,13 @@
     });
   };
 
-  document.getElementById("authToggleBtn").onclick = function(){
+  var _toggleBtn = document.getElementById("authToggleBtn");
+  if(_toggleBtn) _toggleBtn.onclick = function(){
     setAuthMode(_authMode === "signin" ? "register" : "signin");
   };
 
-  document.getElementById("authSubmitBtn").onclick = function(){
+  var _submitBtn = document.getElementById("authSubmitBtn");
+  if(_submitBtn) _submitBtn.onclick = function(){
     var email    = (document.getElementById("authEmail").value||"").trim();
     var password = (document.getElementById("authPassword").value||"").trim();
     var name     = (document.getElementById("authName")||{}).value ? document.getElementById("authName").value.trim() : "";
@@ -1145,15 +1148,15 @@
   };
 
   // Allow Enter key on password field
-  document.getElementById("authPassword").addEventListener("keydown", function(e){
+  var _safeEl14 = document.getElementById("authPassword"); if(_safeEl14) _safeEl14.addEventListener("keydown", function(e){
     if(e.key === "Enter") document.getElementById("authSubmitBtn").click();
   });
-  document.getElementById("authEmail").addEventListener("keydown", function(e){
+  var _safeEl15 = document.getElementById("authEmail"); if(_safeEl15) _safeEl15.addEventListener("keydown", function(e){
     if(e.key === "Enter") document.getElementById("authPassword").focus();
   });
 
   // Forgot password
-  document.getElementById("authForgotBtn").onclick = function(){
+  var _safeEl16 = document.getElementById("authForgotBtn"); if(_safeEl16) _safeEl16.onclick = function(){
     var email = (document.getElementById("authEmail").value||"").trim();
     if(!email){ showAuthError("Enter your email address first."); return; }
     if(!window.firebaseAuth){ showAuthError("Auth not ready."); return; }
@@ -1226,7 +1229,7 @@
   }
   // Apply on load
   applyTheme(getEffectiveTheme());
-  document.getElementById("darkModeBtn").onclick = function(){
+  var _safeEl17 = document.getElementById("darkModeBtn"); if(_safeEl17) _safeEl17.onclick = function(){
     var current = document.documentElement.getAttribute("data-theme") || getEffectiveTheme();
     applyTheme(current === "dark" ? "light" : "dark");
   };
@@ -1334,14 +1337,14 @@
     });
   }
 
-  document.getElementById("addOnCallRole").onclick = function(){
+  var _safeEl18 = document.getElementById("addOnCallRole"); if(_safeEl18) _safeEl18.onclick = function(){
     if(!state.onCallStaff) state.onCallStaff = [];
     state.onCallStaff.push({role:"",name:"",ward:""});
     renderOnCallFields();
   };
-  document.getElementById("closeOnCall").onclick  = function(){ document.getElementById("onCallOverlay").classList.remove("show"); };
-  document.getElementById("cancelOnCall").onclick = function(){ document.getElementById("onCallOverlay").classList.remove("show"); };
-  document.getElementById("saveOnCall").onclick   = function(){
+  var _safeEl19 = document.getElementById("closeOnCall"); if(_safeEl19) _safeEl19.onclick = function(){ document.getElementById("onCallOverlay").classList.remove("show"); };
+  var _safeEl20 = document.getElementById("cancelOnCall"); if(_safeEl20) _safeEl20.onclick = function(){ document.getElementById("onCallOverlay").classList.remove("show"); };
+  var _safeEl21 = document.getElementById("saveOnCall"); if(_safeEl21) _safeEl21.onclick = function(){
     saveState();
     renderOnCallBar();
     document.getElementById("onCallOverlay").classList.remove("show");
@@ -1402,7 +1405,7 @@
     }
   }
 
-  document.getElementById("activityFeedBtn").onclick = function(){
+  var _safeEl22 = document.getElementById("activityFeedBtn"); if(_safeEl22) _safeEl22.onclick = function(){
     _feedOpen = !_feedOpen;
     document.getElementById("activityFeedPanel").classList.toggle("open", _feedOpen);
     if(_feedOpen){
@@ -1411,7 +1414,7 @@
       updateFeedBadge();
     }
   };
-  document.getElementById("closeFeedPanel").onclick = function(){
+  var _safeEl23 = document.getElementById("closeFeedPanel"); if(_safeEl23) _safeEl23.onclick = function(){
     _feedOpen = false;
     document.getElementById("activityFeedPanel").classList.remove("open");
   };
@@ -1500,7 +1503,7 @@
   function closeConfirmModal(){ document.getElementById("confirmOverlay").classList.remove("show"); _confirmCallback = null; }
   document.getElementById("closeConfirm").onclick  = closeConfirmModal;
   document.getElementById("cancelConfirm").onclick = closeConfirmModal;
-  document.getElementById("okConfirm").onclick = function(){
+  var _safeEl24 = document.getElementById("okConfirm"); if(_safeEl24) _safeEl24.onclick = function(){
     closeConfirmModal();
     if(_confirmCallback) _confirmCallback();
   };
@@ -1511,8 +1514,8 @@
     document.getElementById("notifInfoMsg").textContent   = msg;
     document.getElementById("notifInfoOverlay").classList.add("show");
   }
-  document.getElementById("closeNotifInfo").onclick = function(){ document.getElementById("notifInfoOverlay").classList.remove("show"); };
-  document.getElementById("okNotifInfo").onclick    = function(){ document.getElementById("notifInfoOverlay").classList.remove("show"); };
+  var _safeEl25 = document.getElementById("closeNotifInfo"); if(_safeEl25) _safeEl25.onclick = function(){ document.getElementById("notifInfoOverlay").classList.remove("show"); };
+  var _safeEl26 = document.getElementById("okNotifInfo"); if(_safeEl26) _safeEl26.onclick = function(){ document.getElementById("notifInfoOverlay").classList.remove("show"); };
 
   /* Set Name Modal */
   function openSetNameModal(){
@@ -1526,8 +1529,8 @@
   function closeSetNameModal(){ document.getElementById("setNameOverlay").classList.remove("show"); }
   document.getElementById("closeSetName").onclick  = closeSetNameModal;
   document.getElementById("cancelSetName").onclick = closeSetNameModal;
-  document.getElementById("setNameInput").addEventListener("keydown", function(e){ if(e.key==="Enter") document.getElementById("confirmSetName").click(); });
-  document.getElementById("confirmSetName").onclick = function(){
+  var _safeEl27 = document.getElementById("setNameInput"); if(_safeEl27) _safeEl27.addEventListener("keydown", function(e){ if(e.key==="Enter") document.getElementById("confirmSetName").click(); });
+  var _safeEl28 = document.getElementById("confirmSetName"); if(_safeEl28) _safeEl28.onclick = function(){
     var inp = document.getElementById("setNameInput");
     var err = document.getElementById("setNameError");
     var clean = (inp.value||"").trim();
@@ -1557,8 +1560,8 @@
   function closeAddWardModal(){ document.getElementById("addWardOverlay").classList.remove("show"); }
   document.getElementById("closeAddWard").onclick  = closeAddWardModal;
   document.getElementById("cancelAddWard").onclick = closeAddWardModal;
-  document.getElementById("addWardInput").addEventListener("keydown", function(e){ if(e.key==="Enter") document.getElementById("confirmAddWard").click(); });
-  document.getElementById("confirmAddWard").onclick = function(){
+  var _safeEl29 = document.getElementById("addWardInput"); if(_safeEl29) _safeEl29.addEventListener("keydown", function(e){ if(e.key==="Enter") document.getElementById("confirmAddWard").click(); });
+  var _safeEl30 = document.getElementById("confirmAddWard"); if(_safeEl30) _safeEl30.onclick = function(){
     var inp = document.getElementById("addWardInput");
     var err = document.getElementById("addWardError");
     var name = (inp.value||"").trim();
@@ -2737,8 +2740,8 @@
     var el = document.getElementById(id);
     if(el) el.addEventListener("change", function(){ updateReviewPreview("p_nextReview","p_nextReviewDay","p_reviewPreview"); });
   });
-  document.getElementById("f_clearReview").onclick = function(){ document.getElementById("f_nextReview").value=""; document.getElementById("f_nextReviewDay").value="today"; updateReviewPreview("f_nextReview","f_nextReviewDay","f_reviewPreview"); };
-  document.getElementById("p_clearReview").onclick = function(){ document.getElementById("p_nextReview").value=""; document.getElementById("p_nextReviewDay").value="today"; updateReviewPreview("p_nextReview","p_nextReviewDay","p_reviewPreview"); };
+  var _safeEl31 = document.getElementById("f_clearReview"); if(_safeEl31) _safeEl31.onclick = function(){ document.getElementById("f_nextReview").value=""; document.getElementById("f_nextReviewDay").value="today"; updateReviewPreview("f_nextReview","f_nextReviewDay","f_reviewPreview"); };
+  var _safeEl32 = document.getElementById("p_clearReview"); if(_safeEl32) _safeEl32.onclick = function(){ document.getElementById("p_nextReview").value=""; document.getElementById("p_nextReviewDay").value="today"; updateReviewPreview("p_nextReview","p_nextReviewDay","p_reviewPreview"); };
 
 
   /* ============================================================
@@ -2802,11 +2805,11 @@
     }
   }
 
-  document.getElementById("transferWardSelect").addEventListener("change", function(){ populateTransferBeds(this.value); });
-  document.getElementById("closeTransfer").onclick  = function(){ document.getElementById("transferOverlay").classList.remove("show"); _pendingTransfer=null; };
-  document.getElementById("cancelTransfer").onclick = function(){ document.getElementById("transferOverlay").classList.remove("show"); _pendingTransfer=null; };
+  var _safeEl33 = document.getElementById("transferWardSelect"); if(_safeEl33) _safeEl33.addEventListener("change", function(){ populateTransferBeds(this.value); });
+  var _safeEl34 = document.getElementById("closeTransfer"); if(_safeEl34) _safeEl34.onclick = function(){ document.getElementById("transferOverlay").classList.remove("show"); _pendingTransfer=null; };
+  var _safeEl35 = document.getElementById("cancelTransfer"); if(_safeEl35) _safeEl35.onclick = function(){ document.getElementById("transferOverlay").classList.remove("show"); _pendingTransfer=null; };
 
-  document.getElementById("confirmTransfer").onclick = function(){
+  var _safeEl36 = document.getElementById("confirmTransfer"); if(_safeEl36) _safeEl36.onclick = function(){
     if(!_pendingTransfer) return;
     var toWardId = document.getElementById("transferWardSelect").value;
     var toBed    = document.getElementById("transferBedSelect").value;
@@ -2895,10 +2898,10 @@
     document.getElementById("dischargeSummaryOverlay").classList.add("show");
   }
 
-  document.getElementById("closeDischargeSummary").onclick  = function(){ document.getElementById("dischargeSummaryOverlay").classList.remove("show"); _pendingDischarge=null; };
-  document.getElementById("cancelDischargeSummary").onclick = function(){ document.getElementById("dischargeSummaryOverlay").classList.remove("show"); _pendingDischarge=null; };
+  var _safeEl37 = document.getElementById("closeDischargeSummary"); if(_safeEl37) _safeEl37.onclick = function(){ document.getElementById("dischargeSummaryOverlay").classList.remove("show"); _pendingDischarge=null; };
+  var _safeEl38 = document.getElementById("cancelDischargeSummary"); if(_safeEl38) _safeEl38.onclick = function(){ document.getElementById("dischargeSummaryOverlay").classList.remove("show"); _pendingDischarge=null; };
 
-  document.getElementById("printDischargeSummary").onclick = function(){
+  var _safeEl39 = document.getElementById("printDischargeSummary"); if(_safeEl39) _safeEl39.onclick = function(){
     var content = document.getElementById("dischargeSummaryContent").innerHTML;
     var win = window.open("","_blank","width=700,height=900");
     win.document.write('<html><head><title>Discharge Summary</title><style>body{font-family:sans-serif;padding:32px;font-size:11pt;line-height:1.6}.ds-label{font-size:8pt;text-transform:uppercase;letter-spacing:.05em;color:#666;margin-bottom:2px}.ds-value{font-size:11pt;margin-bottom:12px;border-bottom:1px solid #eee;padding-bottom:8px}</style></head><body>'+content+'</body></html>');
@@ -2907,7 +2910,7 @@
     setTimeout(function(){ win.print(); }, 300);
   };
 
-  document.getElementById("confirmDischargeBtn").onclick = function(){
+  var _safeEl40 = document.getElementById("confirmDischargeBtn"); if(_safeEl40) _safeEl40.onclick = function(){
     if(!_pendingDischarge) return;
     var room = _pendingDischarge.room, bed = _pendingDischarge.bed;
     var dischargedName = (currentWard().rooms[bedKey(room,bed)]||{}).name || (room+bed);
@@ -2937,9 +2940,9 @@
     document.getElementById("hodStatsOverlay").classList.add("show");
   }
 
-  document.getElementById("closeHodStats").onclick = function(){ document.getElementById("hodStatsOverlay").classList.remove("show"); };
-  document.getElementById("statsPeriod").addEventListener("change", renderStats);
-  document.getElementById("statsWard").addEventListener("change", renderStats);
+  var _safeEl41 = document.getElementById("closeHodStats"); if(_safeEl41) _safeEl41.onclick = function(){ document.getElementById("hodStatsOverlay").classList.remove("show"); };
+  var _safeEl42 = document.getElementById("statsPeriod"); if(_safeEl42) _safeEl42.addEventListener("change", renderStats);
+  var _safeEl43 = document.getElementById("statsWard"); if(_safeEl43) _safeEl43.addEventListener("change", renderStats);
 
   function renderStats(){
     var days    = parseInt(document.getElementById("statsPeriod").value||"30", 10);
@@ -3005,7 +3008,7 @@
   }
 
   // Wire Lead panel → stats button
-  document.getElementById("hod_statsBtn").onclick = function(){
+  var _safeEl44 = document.getElementById("hod_statsBtn"); if(_safeEl44) _safeEl44.onclick = function(){
     document.getElementById("hodPanelOverlay").classList.remove("show");
     openHodStats();
   };
@@ -3220,7 +3223,7 @@
   /* ============================================================
      FEATURE: DATA BACKUP
   ============================================================ */
-  document.getElementById("hod_backupBtn").onclick = function(){
+  var _safeEl45 = document.getElementById("hod_backupBtn"); if(_safeEl45) _safeEl45.onclick = function(){
     document.getElementById("hodPanelOverlay").classList.remove("show");
     openBackupModal();
   };
@@ -3242,9 +3245,9 @@
     document.getElementById("backupOverlay").classList.add("show");
   }
 
-  document.getElementById("closeBackup").onclick   = function(){ document.getElementById("backupOverlay").classList.remove("show"); };
-  document.getElementById("cancelBackup").onclick  = function(){ document.getElementById("backupOverlay").classList.remove("show"); };
-  document.getElementById("downloadBackup").onclick = function(){
+  var _safeEl46 = document.getElementById("closeBackup"); if(_safeEl46) _safeEl46.onclick = function(){ document.getElementById("backupOverlay").classList.remove("show"); };
+  var _safeEl47 = document.getElementById("cancelBackup"); if(_safeEl47) _safeEl47.onclick = function(){ document.getElementById("backupOverlay").classList.remove("show"); };
+  var _safeEl48 = document.getElementById("downloadBackup"); if(_safeEl48) _safeEl48.onclick = function(){
     var data = JSON.stringify({
       exportedAt: nowISO(),
       exportedBy: getStaffName()||"Lead",
@@ -3265,7 +3268,7 @@
   /* ============================================================
      FEATURE: CENSUS REPORT (printable)
   ============================================================ */
-  document.getElementById("hod_censusBtn").onclick = function(){
+  var _safeEl49 = document.getElementById("hod_censusBtn"); if(_safeEl49) _safeEl49.onclick = function(){
     document.getElementById("hodPanelOverlay").classList.remove("show");
     openCensusModal();
   };
@@ -3285,9 +3288,9 @@
     document.getElementById("censusOverlay").classList.add("show");
   }
 
-  document.getElementById("closeCensus").onclick  = function(){ document.getElementById("censusOverlay").classList.remove("show"); };
-  document.getElementById("cancelCensus").onclick = function(){ document.getElementById("censusOverlay").classList.remove("show"); };
-  document.getElementById("printCensus").onclick  = function(){
+  var _safeEl50 = document.getElementById("closeCensus"); if(_safeEl50) _safeEl50.onclick = function(){ document.getElementById("censusOverlay").classList.remove("show"); };
+  var _safeEl51 = document.getElementById("cancelCensus"); if(_safeEl51) _safeEl51.onclick = function(){ document.getElementById("censusOverlay").classList.remove("show"); };
+  var _safeEl52 = document.getElementById("printCensus"); if(_safeEl52) _safeEl52.onclick = function(){
     var wardId   = document.getElementById("censusWardSel").value;
     var dateStr  = document.getElementById("censusDate").value;
     var dateLabel= dateStr ? new Date(dateStr).toLocaleDateString([],{weekday:"long",day:"2-digit",month:"long",year:"numeric"}) : new Date().toLocaleDateString([],{weekday:"long",day:"2-digit",month:"long",year:"numeric"});
@@ -3403,8 +3406,8 @@
     }).join("");
   }
 
-  document.getElementById("closeShortcuts").onclick = function(){ document.getElementById("shortcutsOverlay").classList.remove("show"); };
-  document.getElementById("okShortcuts").onclick    = function(){ document.getElementById("shortcutsOverlay").classList.remove("show"); };
+  var _safeEl53 = document.getElementById("closeShortcuts"); if(_safeEl53) _safeEl53.onclick = function(){ document.getElementById("shortcutsOverlay").classList.remove("show"); };
+  var _safeEl54 = document.getElementById("okShortcuts"); if(_safeEl54) _safeEl54.onclick = function(){ document.getElementById("shortcutsOverlay").classList.remove("show"); };
 
   document.addEventListener("keydown", function(e){
     // Don't fire when typing in an input/textarea
@@ -3674,10 +3677,10 @@
   /* ============================================================
      FEATURE: RESTORE FROM BACKUP
   ============================================================ */
-  document.getElementById("hod_restoreBtn").onclick = function(){
+  var _safeEl55 = document.getElementById("hod_restoreBtn"); if(_safeEl55) _safeEl55.onclick = function(){
     document.getElementById("hod_restoreFile").click();
   };
-  document.getElementById("hod_restoreFile").onchange = function(e){
+  var _safeEl56 = document.getElementById("hod_restoreFile"); if(_safeEl56) _safeEl56.onchange = function(e){
     var file = e.target.files[0];
     if(!file) return;
     var msg = document.getElementById("hod_restoreMsg");
@@ -3800,7 +3803,7 @@
   }
 
   /* Lead panel button — same action */
-  document.getElementById("hod_notifBtn").onclick = function(){
+  var _safeEl57 = document.getElementById("hod_notifBtn"); if(_safeEl57) _safeEl57.onclick = function(){
     requestNotifPermission(null);
   };
 
@@ -3844,9 +3847,9 @@
     if(b) b.style.display = "none";
   }
 
-  document.getElementById("closeInstallBanner").onclick  = function(){ hideInstallBanner(); localStorage.setItem(INSTALL_DISMISSED_KEY,"1"); };
-  document.getElementById("dismissInstallBanner").onclick = function(){ hideInstallBanner(); localStorage.setItem(INSTALL_DISMISSED_KEY,"1"); };
-  document.getElementById("installAppBtn").onclick = function(){
+  var _safeEl58 = document.getElementById("closeInstallBanner"); if(_safeEl58) _safeEl58.onclick = function(){ hideInstallBanner(); localStorage.setItem(INSTALL_DISMISSED_KEY,"1"); };
+  var _safeEl59 = document.getElementById("dismissInstallBanner"); if(_safeEl59) _safeEl59.onclick = function(){ hideInstallBanner(); localStorage.setItem(INSTALL_DISMISSED_KEY,"1"); };
+  var _safeEl60 = document.getElementById("installAppBtn"); if(_safeEl60) _safeEl60.onclick = function(){
     if(!_deferredInstallPrompt) return;
     _deferredInstallPrompt.prompt();
     _deferredInstallPrompt.userChoice.then(function(r){
