@@ -152,6 +152,32 @@ try {
     var appContent = document.getElementById("appContent");
     if(appContent && attempt === 1) appContent.style.display = "none";
 
+    // ── Hospital Head fast-path ──
+    // If this user is the headUid of the hospital, they are always approved
+    // as dept_head. No staff record needed.
+    get(ref(db, "hospitals/" + _hospitalId + "/headUid")).then(function(snap) {
+      if(snap.val() === user.uid) {
+        console.log("[Auth] Hospital Head detected — bypassing staff record check");
+        localStorage.setItem("wb_approved_" + user.uid, "1");
+        localStorage.setItem("wb_role_" + user.uid, "dept_head");
+        if(window.onAuthReady) window.onAuthReady(user, {
+          role: "dept_head", status: "approved",
+          name: user.displayName || "Hospital Head",
+          email: user.email
+        });
+        startDatabaseSync(user);
+      } else {
+        // Not the head — do normal staff record check
+        doStaffCheck(user, attempt);
+      }
+    }).catch(function() {
+      // Can't read headUid — fall through to normal check
+      doStaffCheck(user, attempt);
+    });
+  }
+
+  function doStaffCheck(user, attempt) {
+
     const staffRef = ref(db, "hospitals/" + _hospitalId + "/depts/" + _deptId + "/staff/" + user.uid);
     get(staffRef).then(function(snap) {
       const data = snap.val();
