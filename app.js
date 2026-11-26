@@ -2,6 +2,12 @@
 (function(){
   "use strict";
 
+  // Safe element event wiring — never crashes if element missing
+  function on(id, evt, fn) {
+    var el = document.getElementById(id);
+    if(el) el[evt] = fn;
+  }
+
   var STORAGE_KEY = "ward_board_v3";
   var STAFF_NAME_KEY = "ward_board_staff_name";
   var ROOMS_PER_WARD = 24;
@@ -988,7 +994,7 @@
     if(!hospList) return;
 
     // Loading state
-    if(hospitals === null) {
+    if(hospitals === null || hospitals === undefined) {
       hospList.innerHTML = '<p style="color:rgba(255,255,255,0.4);font-size:0.85rem;padding:12px 0;">⏳ Loading hospitals…</p>';
       return;
     }
@@ -1000,7 +1006,31 @@
     }
 
     // Render hospitals
-    var hospKeys = Object.keys(hospitals);
+    var hospKeys = Object.keys(hospitals || {});
+
+    // Auto-select if only one hospital — skip manual selection
+    if(hospKeys.length === 1) {
+      var autoHospId = hospKeys[0];
+      if(window.firebaseLoadDepts) {
+        hospList.innerHTML = '<p style="color:rgba(255,255,255,0.4);font-size:0.85rem;padding:12px 0;">⏳ Connecting to ' + escapeHtml((hospitals[autoHospId]||{}).name||autoHospId) + '…</p>';
+        window.firebaseLoadDepts(autoHospId).then(function(depts) {
+          var deptKeys = Object.keys(depts||{});
+          if(deptKeys.length === 1) {
+            // Only one dept too — auto-select both and go straight in
+            localStorage.setItem("wb_hosp_name", (hospitals[autoHospId]||{}).name||autoHospId);
+            localStorage.setItem("wb_dept_name", (depts[deptKeys[0]]||{}).name||deptKeys[0]);
+            if(window.firebaseSetOrgContext) window.firebaseSetOrgContext(user, autoHospId, deptKeys[0]);
+          } else {
+            // Multiple depts — show dept selector only
+            renderHospDeptSelector(hospitals, hospKeys, depts, deptKeys, user, autoHospId, hospList, deptSection, deptList, orgConfirmBtn, orgStatusMsg);
+          }
+        }).catch(function() {
+          hospList.innerHTML = '<p style="color:#e05252;font-size:0.82rem;">Could not load departments. Try refreshing.</p>';
+        });
+      }
+      return;
+    }
+
     if(hospKeys.length === 0) {
       hospList.innerHTML = '<p style="color:rgba(255,255,255,0.4);font-size:0.85rem;padding:12px 0;">No hospitals registered yet. Contact your system administrator.</p>';
     } else {
@@ -1065,6 +1095,72 @@
       };
     }
   };
+
+  /* ── Renders hospital + dept selector for multi-hospital/dept scenarios ── */
+  function renderHospDeptSelector(hospitals, hospKeys, depts, deptKeys, user, preselectedHospId, hospList, deptSection, deptList, orgConfirmBtn, orgStatusMsg) {
+    var selectedHospId = preselectedHospId || null;
+    var selectedDeptId = null;
+
+    hospList.innerHTML = hospKeys.map(function(hid) {
+      var h = hospitals[hid];
+      var active = hid === preselectedHospId;
+      return '<button class="org-select-btn" data-id="'+hid+'" style="width:100%;text-align:left;background:'+(active?"rgba(13,122,104,0.15)":"rgba(255,255,255,0.05)")+';border:1px solid '+(active?"#0fb898":"rgba(255,255,255,0.1)")+';border-radius:10px;padding:12px 16px;color:#fff;font-size:0.9rem;font-weight:600;cursor:pointer;margin-bottom:8px;font-family:inherit;">🏥 '+escapeHtml(h.name||hid)+'</button>';
+    }).join("");
+
+    hospList.querySelectorAll(".org-select-btn").forEach(function(btn) {
+      btn.onclick = function() {
+        hospList.querySelectorAll(".org-select-btn").forEach(function(b){ b.style.borderColor="rgba(255,255,255,0.1)"; b.style.background="rgba(255,255,255,0.05)"; });
+        btn.style.borderColor="#0fb898"; btn.style.background="rgba(13,122,104,0.15)";
+        selectedHospId = btn.getAttribute("data-id");
+        selectedDeptId = null;
+        if(orgConfirmBtn) orgConfirmBtn.disabled = true;
+        if(deptSection) deptSection.style.display = "block";
+        if(deptList) deptList.innerHTML = '<p style="color:rgba(255,255,255,0.4);font-size:0.82rem;">Loading departments…</p>';
+        if(window.firebaseLoadDepts) {
+          window.firebaseLoadDepts(selectedHospId).then(function(d) {
+            var dk = Object.keys(d||{});
+            if(!dk.length) { deptList.innerHTML = '<p style="color:rgba(255,255,255,0.4);font-size:0.82rem;">No departments found.</p>'; return; }
+            deptList.innerHTML = dk.map(function(did) {
+              return '<button class="dept-select-btn" data-id="'+did+'" data-name="'+escapeHtml((d[did]||{}).name||did)+'" style="width:100%;text-align:left;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:11px 16px;color:#fff;font-size:0.85rem;font-weight:600;cursor:pointer;margin-bottom:8px;font-family:inherit;">🩺 '+escapeHtml((d[did]||{}).name||did)+'</button>';
+            }).join("");
+            deptList.querySelectorAll(".dept-select-btn").forEach(function(db2) {
+              db2.onclick = function() {
+                deptList.querySelectorAll(".dept-select-btn").forEach(function(b){ b.style.borderColor="rgba(255,255,255,0.1)"; b.style.background="rgba(255,255,255,0.05)"; });
+                db2.style.borderColor="#0fb898"; db2.style.background="rgba(13,122,104,0.15)";
+                selectedDeptId = db2.getAttribute("data-id");
+                localStorage.setItem("wb_hosp_name", (hospitals[selectedHospId]||{}).name||selectedHospId);
+                localStorage.setItem("wb_dept_name", db2.getAttribute("data-name")||selectedDeptId);
+                if(orgConfirmBtn) orgConfirmBtn.disabled = false;
+              };
+            });
+          });
+        }
+      };
+    });
+
+    // Show dept section if hospital preselected
+    if(preselectedHospId && deptSection) {
+      deptSection.style.display = "block";
+      deptList.innerHTML = dk ? dk.map(function(did) {
+        return '<button class="dept-select-btn" data-id="'+did+'" data-name="'+escapeHtml((depts[did]||{}).name||did)+'" style="width:100%;text-align:left;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:11px 16px;color:#fff;font-size:0.85rem;font-weight:600;cursor:pointer;margin-bottom:8px;font-family:inherit;">🩺 '+escapeHtml((depts[did]||{}).name||did)+'</button>';
+      }).join("") : '';
+    }
+
+    if(orgConfirmBtn) {
+      orgConfirmBtn.disabled = true;
+      orgConfirmBtn.onclick = function() {
+        if(!selectedHospId || !selectedDeptId) return;
+        orgConfirmBtn.textContent = "Connecting…"; orgConfirmBtn.disabled = true;
+        if(orgStatusMsg) orgStatusMsg.textContent = "";
+        if(window.firebaseSetOrgContext) {
+          window.firebaseSetOrgContext(user, selectedHospId, selectedDeptId).catch(function() {
+            orgConfirmBtn.textContent = "Go to ward →"; orgConfirmBtn.disabled = false;
+            if(orgStatusMsg) orgStatusMsg.textContent = "⚠️ Connection failed. Try again.";
+          });
+        }
+      };
+    }
+  }
 
   /* ── Pending approval screen ─────────────────────────────── */
   window.showPendingScreen = function(user){
@@ -1308,11 +1404,11 @@
     });
   };
 
-  document.getElementById("authToggleBtn").onclick = function(){
+  on("authToggleBtn", "onclick", function(){
     setAuthMode(_authMode === "signin" ? "register" : "signin");
-  };
+  });
 
-  document.getElementById("authSubmitBtn").onclick = function(){
+  on("authSubmitBtn", "onclick", function(){
     var email    = (document.getElementById("authEmail").value||"").trim();
     var password = (document.getElementById("authPassword").value||"").trim();
     var name     = (document.getElementById("authName")||{}).value ? document.getElementById("authName").value.trim() : "";
@@ -1361,14 +1457,16 @@
         showAuthError("Error: " + msg);
       }
     });
-  };
+  });
 
   // Allow Enter key on password field
-  document.getElementById("authPassword").addEventListener("keydown", function(e){
-    if(e.key === "Enter") document.getElementById("authSubmitBtn").click();
+  var _authPassEl = document.getElementById("authPassword");
+  if(_authPassEl) _authPassEl.addEventListener("keydown", function(e){
+    if(e.key === "Enter") { var sb = document.getElementById("authSubmitBtn"); if(sb) sb.click(); }
   });
-  document.getElementById("authEmail").addEventListener("keydown", function(e){
-    if(e.key === "Enter") document.getElementById("authPassword").focus();
+  var _authEmailEl = document.getElementById("authEmail");
+  if(_authEmailEl) _authEmailEl.addEventListener("keydown", function(e){
+    if(e.key === "Enter") { var pb = document.getElementById("authPassword"); if(pb) pb.focus(); }
   });
 
   // Forgot password
