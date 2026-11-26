@@ -2,12 +2,6 @@
 (function(){
   "use strict";
 
-  // Safe element event wiring — never crashes if element missing
-  function on(id, evt, fn) {
-    var el = document.getElementById(id);
-    if(el) el[evt] = fn;
-  }
-
   var STORAGE_KEY = "ward_board_v3";
   var STAFF_NAME_KEY = "ward_board_staff_name";
   var ROOMS_PER_WARD = 24;
@@ -143,42 +137,28 @@
   }
 
   /* ============================================================
-     LEAD ACCESS CONTROL — v3.0
-     PIN is now SHA-256 hashed and stored in Firebase per department.
-     Never stored in localStorage. Verified server-side via firebasePin.
+     LEAD ACCESS CONTROL
+     Default PIN: 1234  (Lead should change it on first use)
+     PIN is stored hashed (simple FNV-32) in localStorage.
      Session unlocked flag lives only in memory — resets on reload.
   ============================================================ */
-  var hodUnlocked = false;
+  var LEAD_PIN_KEY  = "ward_board_lead_pin";
+  var LEAD_DEFAULT  = "1234";
+  var hodUnlocked  = false;
 
-  /* Async PIN check — calls Firebase */
-  function checkPin(pin, callback) {
-    if(window.firebasePin && window.firebasePin.verify) {
-      window.firebasePin.verify(pin).then(function(ok) {
-        callback(ok);
-      }).catch(function() { callback(false); });
-    } else {
-      // Fallback during Firebase init — deny access
-      callback(false);
-    }
+  function fnv32(str){
+    var h = 0x811c9dc5;
+    for(var i=0;i<str.length;i++){ h ^= str.charCodeAt(i); h = (h * 0x01000193) >>> 0; }
+    return h.toString(16);
   }
-
-  /* Change PIN — stores new hash in Firebase */
-  function savePin(pin) {
-    if(window.firebasePin && window.firebasePin.change) {
-      window.firebasePin.change(pin).then(function() {
-        showToast("✅ PIN updated successfully");
-      }).catch(function() {
-        showToast("❌ Failed to update PIN — check connection");
-      });
-    }
+  function getStoredPinHash(){
+    return localStorage.getItem(LEAD_PIN_KEY) || fnv32(LEAD_DEFAULT);
   }
-
-  /* Migrate legacy FNV PIN from localStorage if present */
-  function migrateLegacyPin() {
-    if(window.firebasePin && window.firebasePin.hasLegacyPin && window.firebasePin.hasLegacyPin()) {
-      window.firebasePin.clearLegacy();
-      showToast("🔐 PIN security upgraded — please set a new PIN in Lead Panel");
-    }
+  function checkPin(pin){
+    return fnv32(pin) === getStoredPinHash();
+  }
+  function savePin(pin){
+    localStorage.setItem(LEAD_PIN_KEY, fnv32(pin));
   }
 
   /* Log an event to state.hodLog (last 30 days rolling) */
@@ -244,23 +224,17 @@
   document.getElementById("submitHodPin").onclick = function(){
     var pin = (document.getElementById("hodPinInput").value || "").trim();
     var err = document.getElementById("hodPinError");
-    var btn = document.getElementById("submitHodPin");
     if(!pin){ err.textContent="Please enter the PIN."; err.style.display="block"; return; }
-    btn.textContent = "Checking…"; btn.disabled = true;
-    checkPin(pin, function(ok) {
-      btn.textContent = "Unlock"; btn.disabled = false;
-      if(ok){
-        closeHodPin();
-        unlockHod();
-        openHodPanel();
-        migrateLegacyPin();
-      } else {
-        err.textContent = "❌ Incorrect PIN. Try again.";
-        err.style.display = "block";
-        document.getElementById("hodPinInput").value = "";
-        document.getElementById("hodPinInput").focus();
-      }
-    });
+    if(checkPin(pin)){
+      closeHodPin();
+      unlockHod();
+      openHodPanel();
+    } else {
+      err.textContent = "❌ Incorrect PIN. Try again.";
+      err.style.display = "block";
+      document.getElementById("hodPinInput").value = "";
+      document.getElementById("hodPinInput").focus();
+    }
   };
 
   /* Lead Panel */
@@ -276,86 +250,8 @@
     renderStaffMgmt();
     renderHodHistWardFilter();
     renderHodHistory();
-    renderOrgContext();
     ov.classList.add("show");
   }
-
-  /* Org context display in Lead Panel */
-  function renderOrgContext() {
-    var el = document.getElementById("hodOrgContext");
-    if(!el) return;
-    var hospName = localStorage.getItem("wb_hosp_name") || "—";
-    var deptName = localStorage.getItem("wb_dept_name") || "—";
-    el.innerHTML =
-      '<div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:rgba(255,255,255,0.35);margin-bottom:6px;">Current organisation</div>' +
-      '<div style="font-size:0.9rem;font-weight:600;color:#fff;margin-bottom:2px;">🏥 ' + escapeHtml(hospName) + '</div>' +
-      '<div style="font-size:0.82rem;color:rgba(255,255,255,0.6);">🩺 ' + escapeHtml(deptName) + '</div>';
-  }
-
-  /* Backup export */
-  (function(){
-    var backupBtn = document.getElementById("hodBackupBtn");
-    if(!backupBtn) return;
-    backupBtn.onclick = function() {
-      backupBtn.textContent = "⏳ Exporting…"; backupBtn.disabled = true;
-      var doExport = function(data) {
-        var json = JSON.stringify(data, null, 2);
-        var blob = new Blob([json], {type:"application/json"});
-        var url  = URL.createObjectURL(blob);
-        var a    = document.createElement("a");
-        var date = new Date().toISOString().slice(0,10);
-        a.href = url;
-        a.download = "wardboard-backup-" + date + ".json";
-        document.body.appendChild(a); a.click();
-        document.body.removeChild(a); URL.revokeObjectURL(url);
-        backupBtn.textContent = "✅ Backup downloaded"; backupBtn.disabled = false;
-        setTimeout(function(){ backupBtn.textContent = "💾 Export backup"; }, 3000);
-      };
-      // Try Firebase export first, fall back to local state
-      if(window.firebaseBackup && window.firebaseBackup.exportFull) {
-        window.firebaseBackup.exportFull().then(doExport).catch(function() {
-          // Fallback: export local state
-          doExport({ exportedAt: new Date().toISOString(), source: "localStorage", state: state });
-        });
-      } else {
-        doExport({ exportedAt: new Date().toISOString(), source: "localStorage", state: state });
-      }
-    };
-  })();
-
-  /* Change PIN from Lead Panel */
-  (function(){
-    var changePinBtn = document.getElementById("hodChangePinBtn");
-    if(!changePinBtn) return;
-    changePinBtn.onclick = function() {
-      var newPin = prompt("Enter new PIN (4–8 digits):");
-      if(!newPin || newPin.trim().length < 4) { showToast("PIN must be at least 4 digits"); return; }
-      if(!/^\d+$/.test(newPin.trim())) { showToast("PIN must be digits only"); return; }
-      savePin(newPin.trim());
-    };
-  })();
-
-  /* Switch department */
-  (function(){
-    var switchBtn = document.getElementById("hodSwitchDeptBtn");
-    if(!switchBtn) return;
-    switchBtn.onclick = function() {
-      if(window.firebaseAuth && window.firebaseAuth.loadHospitals) {
-        switchBtn.textContent = "Loading…"; switchBtn.disabled = true;
-        window.firebaseAuth.loadHospitals().then(function(hospitals) {
-          switchBtn.textContent = "🔀 Switch department"; switchBtn.disabled = false;
-          document.getElementById("hodPanelOverlay").classList.remove("show");
-          lockHod();
-          if(window.showOrgSelection && window.firebaseAuth.currentUser()) {
-            window.showOrgSelection(window.firebaseAuth.currentUser(), hospitals);
-          }
-        }).catch(function() {
-          switchBtn.textContent = "🔀 Switch department"; switchBtn.disabled = false;
-          showToast("⚠️ Could not load hospitals");
-        });
-      }
-    };
-  })();
 
   document.getElementById("closeHodPanel").onclick  = function(){ document.getElementById("hodPanelOverlay").classList.remove("show"); };
   document.getElementById("hod_lockBtn").onclick    = lockHod;
@@ -932,235 +828,25 @@
   /* Called by firebase-sync.js when user logs in successfully */
   window.onAuthReady = function(user, data){
     if(window._hideLoading) window._hideLoading();
-    // Hide org selection, auth, pending overlays
-    ["authOverlay","pendingOverlay","orgSelectionOverlay"].forEach(function(id){
-      var el = document.getElementById(id); if(el) el.classList.remove("show");
-    });
+    var authOv = document.getElementById("authOverlay");
+    var pendOv = document.getElementById("pendingOverlay");
+    if(authOv) authOv.classList.remove("show");
+    if(pendOv) pendOv.classList.remove("show");
     var appContent = document.getElementById("appContent");
     if(appContent) appContent.style.display = "block";
-
-    // Cache role for resilience against transient Firebase read failures
-    if(data && data.role) {
-      localStorage.setItem("wb_role_" + user.uid, data.role);
-      localStorage.setItem("wb_approved_" + user.uid, "1");
-    }
-    // Sync display name
+    // Sync display name into app's staff name system
     var displayName = user.displayName || user.email.split("@")[0];
     setStaffName(displayName);
     var btn = document.getElementById("staffNameBtn");
     if(btn) btn.textContent = "👤 " + displayName;
+    // Save email for next login
     localStorage.setItem("wb_last_email", user.email);
-    // Show org context in header
-    if(window.firebaseSync && window.firebaseSync.getContext) {
-      var ctx = window.firebaseSync.getContext();
-      var ctxEl = document.getElementById("orgContextLabel");
-      if(ctxEl && ctx) ctxEl.textContent = "";  // Will be set after hospital name loads
-      // Load hospital + dept names for display
-      if(ctx.hospitalId && ctx.deptId) {
-        Promise.all([
-          fetch ? null : null // names loaded from org selection cache below
-        ]);
-        var cachedHospName = localStorage.getItem("wb_hosp_name") || ctx.hospitalId;
-        var cachedDeptName = localStorage.getItem("wb_dept_name") || ctx.deptId;
-        if(ctxEl) ctxEl.textContent = cachedHospName + " · " + cachedDeptName;
-      }
-    }
-    // Migrate legacy PIN if present
-    migrateLegacyPin();
-    // FCM
+    // Request FCM token if notifications granted
     if(Notification.permission === "granted" && window.requestFCMToken){
       window.requestFCMToken().catch(function(e){ console.warn("FCM token error:", e); });
     }
     console.log("[Auth] Signed in as:", displayName);
   };
-
-  /* ── Org Selection Screen ── */
-  window.showOrgSelection = function(user, hospitals, errorMsg) {
-    if(window._hideLoading) window._hideLoading();
-    var appContent = document.getElementById("appContent");
-    if(appContent) appContent.style.display = "none";
-    var authOv = document.getElementById("authOverlay");
-    if(authOv) authOv.classList.remove("show");
-    var orgOv = document.getElementById("orgSelectionOverlay");
-    if(orgOv) orgOv.classList.add("show");
-
-    var hospList = document.getElementById("orgHospitalList");
-    var deptSection = document.getElementById("orgDeptSection");
-    var deptList = document.getElementById("orgDeptList");
-    var orgConfirmBtn = document.getElementById("orgConfirmBtn");
-    var orgStatusMsg = document.getElementById("orgStatusMsg");
-    var selectedHospId = null, selectedDeptId = null;
-
-    if(!hospList) return;
-
-    // Loading state
-    if(hospitals === null || hospitals === undefined) {
-      hospList.innerHTML = '<p style="color:rgba(255,255,255,0.4);font-size:0.85rem;padding:12px 0;">⏳ Loading hospitals…</p>';
-      return;
-    }
-
-    // Error state
-    if(errorMsg) {
-      hospList.innerHTML = '<p style="color:#e05252;font-size:0.82rem;padding:12px 0;">⚠️ ' + escapeHtml(errorMsg) + '</p>';
-      return;
-    }
-
-    // Render hospitals
-    var hospKeys = Object.keys(hospitals || {});
-
-    // Auto-select if only one hospital — skip manual selection
-    if(hospKeys.length === 1) {
-      var autoHospId = hospKeys[0];
-      if(window.firebaseLoadDepts) {
-        hospList.innerHTML = '<p style="color:rgba(255,255,255,0.4);font-size:0.85rem;padding:12px 0;">⏳ Connecting to ' + escapeHtml((hospitals[autoHospId]||{}).name||autoHospId) + '…</p>';
-        window.firebaseLoadDepts(autoHospId).then(function(depts) {
-          var deptKeys = Object.keys(depts||{});
-          if(deptKeys.length === 1) {
-            // Only one dept too — auto-select both and go straight in
-            localStorage.setItem("wb_hosp_name", (hospitals[autoHospId]||{}).name||autoHospId);
-            localStorage.setItem("wb_dept_name", (depts[deptKeys[0]]||{}).name||deptKeys[0]);
-            if(window.firebaseSetOrgContext) window.firebaseSetOrgContext(user, autoHospId, deptKeys[0]);
-          } else {
-            // Multiple depts — show dept selector only
-            renderHospDeptSelector(hospitals, hospKeys, depts, deptKeys, user, autoHospId, hospList, deptSection, deptList, orgConfirmBtn, orgStatusMsg);
-          }
-        }).catch(function() {
-          hospList.innerHTML = '<p style="color:#e05252;font-size:0.82rem;">Could not load departments. Try refreshing.</p>';
-        });
-      }
-      return;
-    }
-
-    if(hospKeys.length === 0) {
-      hospList.innerHTML = '<p style="color:rgba(255,255,255,0.4);font-size:0.85rem;padding:12px 0;">No hospitals registered yet. Contact your system administrator.</p>';
-    } else {
-      hospList.innerHTML = hospKeys.map(function(hid) {
-        var h = hospitals[hid];
-        return '<button class="org-select-btn" data-id="'+hid+'" style="width:100%;text-align:left;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:12px 16px;color:#fff;font-size:0.9rem;font-weight:600;cursor:pointer;margin-bottom:8px;font-family:inherit;">🏥 '+escapeHtml(h.name||hid)+'</button>';
-      }).join("");
-    }
-
-    // Hospital selection
-    hospList.querySelectorAll(".org-select-btn").forEach(function(btn) {
-      btn.onclick = function() {
-        hospList.querySelectorAll(".org-select-btn").forEach(function(b){ b.style.borderColor="rgba(255,255,255,0.1)"; b.style.background="rgba(255,255,255,0.05)"; });
-        btn.style.borderColor = "#0fb898"; btn.style.background = "rgba(13,122,104,0.15)";
-        selectedHospId = btn.getAttribute("data-id");
-        selectedDeptId = null;
-        if(orgConfirmBtn) orgConfirmBtn.disabled = true;
-        if(deptSection) deptSection.style.display = "block";
-        if(deptList) deptList.innerHTML = '<p style="color:rgba(255,255,255,0.4);font-size:0.82rem;">Loading departments…</p>';
-        // Load departments for selected hospital
-        if(window.firebaseLoadDepts) {
-          window.firebaseLoadDepts(selectedHospId).then(function(depts) {
-            var deptKeys = Object.keys(depts);
-            if(deptKeys.length === 0) {
-              deptList.innerHTML = '<p style="color:rgba(255,255,255,0.4);font-size:0.82rem;">No departments found. Contact your hospital administrator.</p>';
-            } else {
-              deptList.innerHTML = deptKeys.map(function(did) {
-                var d = depts[did];
-                return '<button class="dept-select-btn" data-id="'+did+'" data-name="'+escapeHtml(d.name||did)+'" style="width:100%;text-align:left;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:11px 16px;color:#fff;font-size:0.85rem;font-weight:600;cursor:pointer;margin-bottom:8px;font-family:inherit;">🩺 '+escapeHtml(d.name||did)+'</button>';
-              }).join("");
-              deptList.querySelectorAll(".dept-select-btn").forEach(function(db2) {
-                db2.onclick = function() {
-                  deptList.querySelectorAll(".dept-select-btn").forEach(function(b){ b.style.borderColor="rgba(255,255,255,0.1)"; b.style.background="rgba(255,255,255,0.05)"; });
-                  db2.style.borderColor = "#0fb898"; db2.style.background = "rgba(13,122,104,0.15)";
-                  selectedDeptId = db2.getAttribute("data-id");
-                  // Cache names for header display
-                  var hName = hospitals[selectedHospId] ? (hospitals[selectedHospId].name||selectedHospId) : selectedHospId;
-                  localStorage.setItem("wb_hosp_name", hName);
-                  localStorage.setItem("wb_dept_name", db2.getAttribute("data-name")||selectedDeptId);
-                  if(orgConfirmBtn) orgConfirmBtn.disabled = false;
-                };
-              });
-            }
-          });
-        }
-      };
-    });
-
-    // Confirm button
-    if(orgConfirmBtn) {
-      orgConfirmBtn.disabled = true;
-      orgConfirmBtn.onclick = function() {
-        if(!selectedHospId || !selectedDeptId) return;
-        orgConfirmBtn.textContent = "Connecting…"; orgConfirmBtn.disabled = true;
-        if(orgStatusMsg) orgStatusMsg.textContent = "";
-        if(window.firebaseSetOrgContext) {
-          window.firebaseSetOrgContext(user, selectedHospId, selectedDeptId).catch(function(err) {
-            orgConfirmBtn.textContent = "Go to ward →"; orgConfirmBtn.disabled = false;
-            if(orgStatusMsg) orgStatusMsg.textContent = "⚠️ Connection failed. Try again.";
-          });
-        }
-      };
-    }
-  };
-
-  /* ── Renders hospital + dept selector for multi-hospital/dept scenarios ── */
-  function renderHospDeptSelector(hospitals, hospKeys, depts, deptKeys, user, preselectedHospId, hospList, deptSection, deptList, orgConfirmBtn, orgStatusMsg) {
-    var selectedHospId = preselectedHospId || null;
-    var selectedDeptId = null;
-
-    hospList.innerHTML = hospKeys.map(function(hid) {
-      var h = hospitals[hid];
-      var active = hid === preselectedHospId;
-      return '<button class="org-select-btn" data-id="'+hid+'" style="width:100%;text-align:left;background:'+(active?"rgba(13,122,104,0.15)":"rgba(255,255,255,0.05)")+';border:1px solid '+(active?"#0fb898":"rgba(255,255,255,0.1)")+';border-radius:10px;padding:12px 16px;color:#fff;font-size:0.9rem;font-weight:600;cursor:pointer;margin-bottom:8px;font-family:inherit;">🏥 '+escapeHtml(h.name||hid)+'</button>';
-    }).join("");
-
-    hospList.querySelectorAll(".org-select-btn").forEach(function(btn) {
-      btn.onclick = function() {
-        hospList.querySelectorAll(".org-select-btn").forEach(function(b){ b.style.borderColor="rgba(255,255,255,0.1)"; b.style.background="rgba(255,255,255,0.05)"; });
-        btn.style.borderColor="#0fb898"; btn.style.background="rgba(13,122,104,0.15)";
-        selectedHospId = btn.getAttribute("data-id");
-        selectedDeptId = null;
-        if(orgConfirmBtn) orgConfirmBtn.disabled = true;
-        if(deptSection) deptSection.style.display = "block";
-        if(deptList) deptList.innerHTML = '<p style="color:rgba(255,255,255,0.4);font-size:0.82rem;">Loading departments…</p>';
-        if(window.firebaseLoadDepts) {
-          window.firebaseLoadDepts(selectedHospId).then(function(d) {
-            var dk = Object.keys(d||{});
-            if(!dk.length) { deptList.innerHTML = '<p style="color:rgba(255,255,255,0.4);font-size:0.82rem;">No departments found.</p>'; return; }
-            deptList.innerHTML = dk.map(function(did) {
-              return '<button class="dept-select-btn" data-id="'+did+'" data-name="'+escapeHtml((d[did]||{}).name||did)+'" style="width:100%;text-align:left;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:11px 16px;color:#fff;font-size:0.85rem;font-weight:600;cursor:pointer;margin-bottom:8px;font-family:inherit;">🩺 '+escapeHtml((d[did]||{}).name||did)+'</button>';
-            }).join("");
-            deptList.querySelectorAll(".dept-select-btn").forEach(function(db2) {
-              db2.onclick = function() {
-                deptList.querySelectorAll(".dept-select-btn").forEach(function(b){ b.style.borderColor="rgba(255,255,255,0.1)"; b.style.background="rgba(255,255,255,0.05)"; });
-                db2.style.borderColor="#0fb898"; db2.style.background="rgba(13,122,104,0.15)";
-                selectedDeptId = db2.getAttribute("data-id");
-                localStorage.setItem("wb_hosp_name", (hospitals[selectedHospId]||{}).name||selectedHospId);
-                localStorage.setItem("wb_dept_name", db2.getAttribute("data-name")||selectedDeptId);
-                if(orgConfirmBtn) orgConfirmBtn.disabled = false;
-              };
-            });
-          });
-        }
-      };
-    });
-
-    // Show dept section if hospital preselected
-    if(preselectedHospId && deptSection) {
-      deptSection.style.display = "block";
-      deptList.innerHTML = dk ? dk.map(function(did) {
-        return '<button class="dept-select-btn" data-id="'+did+'" data-name="'+escapeHtml((depts[did]||{}).name||did)+'" style="width:100%;text-align:left;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:11px 16px;color:#fff;font-size:0.85rem;font-weight:600;cursor:pointer;margin-bottom:8px;font-family:inherit;">🩺 '+escapeHtml((depts[did]||{}).name||did)+'</button>';
-      }).join("") : '';
-    }
-
-    if(orgConfirmBtn) {
-      orgConfirmBtn.disabled = true;
-      orgConfirmBtn.onclick = function() {
-        if(!selectedHospId || !selectedDeptId) return;
-        orgConfirmBtn.textContent = "Connecting…"; orgConfirmBtn.disabled = true;
-        if(orgStatusMsg) orgStatusMsg.textContent = "";
-        if(window.firebaseSetOrgContext) {
-          window.firebaseSetOrgContext(user, selectedHospId, selectedDeptId).catch(function() {
-            orgConfirmBtn.textContent = "Go to ward →"; orgConfirmBtn.disabled = false;
-            if(orgStatusMsg) orgStatusMsg.textContent = "⚠️ Connection failed. Try again.";
-          });
-        }
-      };
-    }
-  }
 
   /* ── Pending approval screen ─────────────────────────────── */
   window.showPendingScreen = function(user){
@@ -1389,10 +1075,9 @@
   }
 
   // Google sign-in button
-  var _googleBtn = document.getElementById("googleSignInBtn") || document.getElementById("authGoogleBtn");
-  if(_googleBtn) _googleBtn.onclick = function(){
+  document.getElementById("authGoogleBtn").onclick = function(){
     clearAuthError();
-    var btn = _googleBtn;
+    var btn = document.getElementById("authGoogleBtn");
     btn.textContent = "Signing in…"; btn.disabled = true;
     if(!window.firebaseAuth){ btn.textContent="Not ready"; btn.disabled=false; return; }
     window.firebaseAuth.signInWithGoogle().catch(function(err){
@@ -1404,11 +1089,11 @@
     });
   };
 
-  on("authToggleBtn", "onclick", function(){
+  document.getElementById("authToggleBtn").onclick = function(){
     setAuthMode(_authMode === "signin" ? "register" : "signin");
-  });
+  };
 
-  on("authSubmitBtn", "onclick", function(){
+  document.getElementById("authSubmitBtn").onclick = function(){
     var email    = (document.getElementById("authEmail").value||"").trim();
     var password = (document.getElementById("authPassword").value||"").trim();
     var name     = (document.getElementById("authName")||{}).value ? document.getElementById("authName").value.trim() : "";
@@ -1457,16 +1142,14 @@
         showAuthError("Error: " + msg);
       }
     });
-  });
+  };
 
   // Allow Enter key on password field
-  var _authPassEl = document.getElementById("authPassword");
-  if(_authPassEl) _authPassEl.addEventListener("keydown", function(e){
-    if(e.key === "Enter") { var sb = document.getElementById("authSubmitBtn"); if(sb) sb.click(); }
+  document.getElementById("authPassword").addEventListener("keydown", function(e){
+    if(e.key === "Enter") document.getElementById("authSubmitBtn").click();
   });
-  var _authEmailEl = document.getElementById("authEmail");
-  if(_authEmailEl) _authEmailEl.addEventListener("keydown", function(e){
-    if(e.key === "Enter") { var pb = document.getElementById("authPassword"); if(pb) pb.focus(); }
+  document.getElementById("authEmail").addEventListener("keydown", function(e){
+    if(e.key === "Enter") document.getElementById("authPassword").focus();
   });
 
   // Forgot password
@@ -1531,9 +1214,8 @@
   var THEME_KEY = "wb_theme";
   function getEffectiveTheme(){
     var stored = localStorage.getItem(THEME_KEY);
-    // Theme B: default is always light — no OS auto-switch
-    // User can manually toggle to dark via the button
-    return stored || "light";
+    if(stored) return stored;
+    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
   }
   function applyTheme(theme){
     document.documentElement.setAttribute("data-theme", theme);
@@ -2418,16 +2100,12 @@
 
     var moreMenu = document.createElement("div");
     moreMenu.style.cssText = "display:none;position:absolute;bottom:calc(100% + 6px);right:0;background:var(--card);border:1px solid var(--line);border-radius:var(--r-md);box-shadow:0 8px 24px rgba(0,0,0,0.15);min-width:160px;z-index:50;overflow:hidden;";
-    var isWatched = state.patientWatches && state.patientWatches[activeWardId+"_"+room+bed];
-    var isMuted   = state.patientMutes   && state.patientMutes[activeWardId+"_"+room+bed];
     moreMenu.innerHTML =
       '<button class="overflow-item" id="moreEdit_'+room+bed+'">✏️ Edit patient</button>' +
       '<button class="overflow-item" id="moreTx_'+room+bed+'">🔀 Transfer</button>' +
       '<button class="overflow-item" id="moreShare_'+room+bed+'">📤 Share summary</button>' +
       '<button class="overflow-item" id="morePrint_'+room+bed+'">🖨️ Print card</button>' +
       '<button class="overflow-item" id="moreQR_'+room+bed+'">📱 QR code for bed</button>' +
-      '<button class="overflow-item" id="moreWatch_'+room+bed+'">'+(isWatched?"🔕 Stop watching":"🔔 Watch this patient")+'</button>' +
-      '<button class="overflow-item" id="moreMute_'+room+bed+'">'+(isMuted?"🔔 Unmute notifications":"🔕 Mute notifications")+'</button>' +
       '<div class="overflow-divider"></div>' +
       '<button class="overflow-item" style="color:var(--red);" id="moreDisch_'+room+bed+'">↩ Discharge</button>';
 
@@ -2462,10 +2140,6 @@
       if(pBtn) pBtn.onclick = function(){ moreMenu.style.display="none"; printPatientCard(room, bed); };
       if(dBtn) dBtn.onclick = function(){ moreMenu.style.display="none"; openDischargeSummary(room, bed); };
       if(qBtn) qBtn.onclick = function(){ moreMenu.style.display="none"; openQRModal(room, bed); };
-      var wBtn  = document.getElementById("moreWatch_"+room+bed);
-      var muBtn = document.getElementById("moreMute_"+room+bed);
-      if(wBtn)  wBtn.onclick  = function(){ moreMenu.style.display="none"; if(window.togglePatientWatch) window.togglePatientWatch(activeWardId, room+bed); };
-      if(muBtn) muBtn.onclick = function(){ moreMenu.style.display="none"; if(window.togglePatientMute)  window.togglePatientMute(activeWardId, room+bed); };
     }, 0);
 
     moreWrap.appendChild(moreBtn);
@@ -2667,46 +2341,11 @@
       };
 
       var isNew = !existing;
-      var newAcuity = w.rooms[key].acuity;
-      var oldAcuity = existing ? existing.acuity : null;
-      var patientName = w.rooms[key].name || key;
-      var wardName = currentWard().name;
-
       hodLog(isNew ? "admit" : "edit",
-        (isNew ? "Admitted: " : "Updated: ") + patientName +
+        (isNew ? "Admitted: " : "Updated: ") + (w.rooms[key].name || key) +
         (w.rooms[key].diagnosis ? " — " + w.rooms[key].diagnosis : ""),
-        wardName
+        currentWard().name
       );
-
-      // ── Notification triggers ──
-      if(isNew) {
-        // New admission
-        if(window.fireNotif) window.fireNotif(
-          "admitDischarge",
-          "New admission — " + wardName,
-          patientName + (w.rooms[key].diagnosis ? " · " + w.rooms[key].diagnosis : ""),
-          { wardId: activeWardId, bedKey: key, wardName: wardName }
-        );
-      } else if(oldAcuity && newAcuity !== oldAcuity) {
-        // Acuity changed
-        var acuityLabel = { stable:"🟢 Stable", review:"🟡 Needs Review", urgent:"🔴 Urgent" };
-        if(newAcuity === "urgent") {
-          if(window.fireNotif) window.fireNotif(
-            "urgentAll",
-            "🚨 URGENT — " + patientName,
-            wardName + " · " + (w.rooms[key].diagnosis || ""),
-            { wardId: activeWardId, bedKey: key, wardName: wardName }
-          );
-        } else {
-          if(window.fireNotif) window.fireNotif(
-            "acuityChange",
-            "Acuity change — " + patientName,
-            (acuityLabel[oldAcuity]||oldAcuity) + " → " + (acuityLabel[newAcuity]||newAcuity) + " · " + wardName,
-            { wardId: activeWardId, bedKey: key, wardName: wardName }
-          );
-        }
-      }
-
       var _pr = currentBedForModal.room, _pb = currentBedForModal.bed;
       saveState();
       closePatientModal();
@@ -2791,42 +2430,18 @@
         nextReview: buildReviewISO((document.getElementById("p_nextReview")||{}).value||"", (document.getElementById("p_nextReviewDay")||{}).value||"today"),
         updatedBy: staffName
       };
-      var oldProgressAcuity = patient.acuity;
       patient.acuity = progressAcuity;
       patient.lastUpdated = entry.time;
       patient.lastUpdatedBy = staffName;
       if(!patient.history) patient.history = [];
       patient.history.push(entry);
-      var progressWardName = currentWard().name;
-      var progressPatientName = patient.name || (currentBedForProgress.room + currentBedForProgress.bed);
       hodLog("progress",
-        progressPatientName +
+        (patient.name || currentBedForProgress.room + currentBedForProgress.bed) +
         " — " + progressAcuity +
         (entry.situation ? " | " + entry.situation.slice(0,80) : "") +
         (entry.plan ? " | Plan: " + entry.plan.slice(0,60) : ""),
-        progressWardName
+        currentWard().name
       );
-
-      // ── Notification triggers ──
-      if(oldProgressAcuity !== progressAcuity && window.fireNotif) {
-        var acuityLabel2 = { stable:"🟢 Stable", review:"🟡 Needs Review", urgent:"🔴 Urgent" };
-        if(progressAcuity === "urgent") {
-          window.fireNotif(
-            "urgentAll",
-            "🚨 URGENT — " + progressPatientName,
-            progressWardName + (entry.situation ? " · " + entry.situation.slice(0,60) : ""),
-            { wardId: activeWardId, bedKey: bedKey(currentBedForProgress.room, currentBedForProgress.bed), wardName: progressWardName }
-          );
-        } else {
-          window.fireNotif(
-            "acuityChange",
-            "Acuity change — " + progressPatientName,
-            (acuityLabel2[oldProgressAcuity]||oldProgressAcuity) + " → " + (acuityLabel2[progressAcuity]||progressAcuity) + " · " + progressWardName,
-            { wardId: activeWardId, bedKey: bedKey(currentBedForProgress.room, currentBedForProgress.bed), wardName: progressWardName }
-          );
-        }
-      }
-
       saveState();
       var _flashRoom = currentBedForProgress.room, _flashBed = currentBedForProgress.bed;
       closeProgressModal();
@@ -3295,19 +2910,8 @@
   document.getElementById("confirmDischargeBtn").onclick = function(){
     if(!_pendingDischarge) return;
     var room = _pendingDischarge.room, bed = _pendingDischarge.bed;
-    var dischargedPatient = currentWard().rooms[bedKey(room,bed)] || {};
-    var dischargedName = dischargedPatient.name || (room+bed);
-    var dischargedWard  = currentWard().name;
-    hodLog("discharge","Discharged: "+dischargedName+" from "+room+bed, dischargedWard);
-
-    // ── Notification trigger ──
-    if(window.fireNotif) window.fireNotif(
-      "admitDischarge",
-      "Patient discharged — " + dischargedWard,
-      dischargedName + " · Bed " + room + bed,
-      { wardId: activeWardId, bedKey: bedKey(room,bed), wardName: dischargedWard }
-    );
-
+    var dischargedName = (currentWard().rooms[bedKey(room,bed)]||{}).name || (room+bed);
+    hodLog("discharge","Discharged: "+dischargedName+" from "+room+bed, currentWard().name);
     delete currentWard().rooms[bedKey(room,bed)];
     saveState();
     document.getElementById("dischargeSummaryOverlay").classList.remove("show");
@@ -4449,21 +4053,13 @@
 
     if(confirmSignoff) confirmSignoff.onclick = function(){
       var pin = (signoffPin.value || "").trim();
-      confirmSignoff.textContent = "Checking…"; confirmSignoff.disabled = true;
-      checkPin(pin, function(ok) {
-        confirmSignoff.textContent = "✍️ Sign & Lock Handover"; confirmSignoff.disabled = false;
-        if(!ok){
-          signoffError.textContent = "❌ Incorrect PIN. Only the Lead can sign off a handover.";
-          signoffError.style.display = "block";
-          signoffPin.value = "";
-          return;
-        }
-        signoffError.style.display = "none";
-        doSignoff();
-      });
-    };
-
-    function doSignoff(){
+      if(!checkPin(pin)){
+        signoffError.textContent = "❌ Incorrect PIN. Only the Lead can sign off a handover.";
+        signoffError.style.display = "block";
+        signoffPin.value = "";
+        return;
+      }
+      signoffError.style.display = "none";
 
       if(!state.signedHandovers) state.signedHandovers = [];
       var entry = {
@@ -4479,15 +4075,6 @@
       if(state.signedHandovers.length > 60) state.signedHandovers = state.signedHandovers.slice(0, 60);
 
       hodLog("handover", "Signed handover — " + entry.ward + " · " + entry.signedBy, entry.ward);
-
-      // ── Notification trigger ──
-      if(window.fireNotif) window.fireNotif(
-        "handoverSigned",
-        "Handover signed — " + entry.ward,
-        "Signed by " + entry.signedBy + " · " + fmtTime(entry.signedAt),
-        { wardName: entry.ward }
-      );
-
       saveState();
       signoffOverlay.classList.remove("show");
 
@@ -4690,627 +4277,6 @@
       setTimeout(function(){ win.print(); }, 300);
     };
   })();
-
-
-
-  /* ============================================================
-     ROLE SYSTEM — v3.0
-     7 levels: superadmin > hospital_head > dept_head >
-               unit_head > consultant > senior > staff
-     Each role can approve the level directly below it.
-     Approval logged with approver name + timestamp.
-  ============================================================ */
-  var ROLES = {
-    superadmin:    { level: 7, label: "Super Admin",     icon: "⚙️" },
-    hospital_head: { level: 6, label: "Hospital Head",   icon: "🏥" },
-    dept_head:     { level: 5, label: "Department Head", icon: "🩺" },
-    unit_head:     { level: 4, label: "Unit Head",       icon: "🏢" },
-    consultant:    { level: 3, label: "Consultant",      icon: "👨‍⚕️" },
-    senior:        { level: 2, label: "Senior",          icon: "🩻" },
-    staff:         { level: 1, label: "Staff",           icon: "👤" }
-  };
-
-  // Permissions matrix — what each role can do
-  var PERMISSIONS = {
-    canAdmit:          ["superadmin","hospital_head","dept_head","unit_head","consultant","senior","staff"],
-    canDischarge:      ["superadmin","hospital_head","dept_head","unit_head","consultant","senior","staff"],
-    canChangeAcuity:   ["superadmin","hospital_head","dept_head","unit_head","consultant","senior"],
-    canChangeFlags:    ["superadmin","hospital_head","dept_head","unit_head","consultant","senior"],
-    canSignHandover:   ["superadmin","hospital_head","dept_head","unit_head"],
-    canApproveStaff:   ["superadmin","hospital_head","dept_head","unit_head"],
-    canManageWards:    ["superadmin","hospital_head","dept_head"],
-    canExportBackup:   ["superadmin","hospital_head","dept_head"],
-    canViewAllWards:   ["superadmin","hospital_head","dept_head","unit_head","consultant"],
-    canAccessTheatre:  ["superadmin","hospital_head","dept_head","unit_head","consultant"],
-    canChangePIN:      ["superadmin","dept_head"],
-    canCreateDepts:    ["superadmin","hospital_head"],
-    canCreateHospitals:["superadmin"]
-  };
-
-  // Current user's role — loaded from Firebase staff record
-  window._currentUserRole = null;
-
-  function setCurrentUserRole(role) {
-    window._currentUserRole = role || "staff";
-  }
-
-  function hasPermission(permission) {
-    var role = window._currentUserRole || "staff";
-    var allowed = PERMISSIONS[permission] || [];
-    return allowed.indexOf(role) !== -1;
-  }
-
-  function getRoleLabel(role) {
-    return ROLES[role] ? ROLES[role].icon + " " + ROLES[role].label : role;
-  }
-
-  function getRoleLevel(role) {
-    return ROLES[role] ? ROLES[role].level : 0;
-  }
-
-  // Load current user's role from Firebase when auth is ready
-  var _origOnAuthReady = window.onAuthReady;
-  window.onAuthReady = function(user, data) {
-    if(data && data.role) {
-      setCurrentUserRole(data.role);
-    } else {
-      setCurrentUserRole("staff");
-    }
-    // Apply permission-based UI
-    applyRoleUI();
-    if(_origOnAuthReady) _origOnAuthReady(user, data);
-  };
-
-  function applyRoleUI() {
-    // Show/hide Lead Panel button based on role
-    var hodBtn = document.getElementById("hodBtn");
-    if(hodBtn) {
-      hodBtn.style.display = hasPermission("canApproveStaff") ? "" : "none";
-    }
-    // Show role badge in header
-    var roleBadge = document.getElementById("roleBadge");
-    if(roleBadge && window._currentUserRole) {
-      var r = ROLES[window._currentUserRole];
-      if(r) {
-        roleBadge.textContent = r.icon + " " + r.label;
-        roleBadge.style.display = "";
-      }
-    }
-    // Ward admission lock — check per-ward setting
-    updateAdmissionLock();
-  }
-
-  function updateAdmissionLock() {
-    // If current ward has admission locked, enforce based on role
-    var w = currentWard ? currentWard() : null;
-    if(!w) return;
-    var lock = w.admissionLock || "none"; // "none" | "soft" | "hard"
-    var canAdmit = hasPermission("canAdmit");
-    if(lock === "hard" && getRoleLevel(window._currentUserRole) < 3) {
-      // Below consultant — cannot admit/discharge
-      document.querySelectorAll(".add-patient-btn").forEach(function(btn) {
-        btn.disabled = true;
-        btn.title = "Admission locked — requires Consultant or above";
-        btn.style.opacity = "0.4";
-      });
-    } else {
-      document.querySelectorAll(".add-patient-btn").forEach(function(btn) {
-        btn.disabled = false;
-        btn.title = "";
-        btn.style.opacity = "";
-      });
-    }
-  }
-
-  // Approval chain — log who approved whom
-  window.approveStaffWithLog = function(uid, staffData) {
-    var approverRole = window._currentUserRole || "staff";
-    var approverName = getStaffName() || "Unknown";
-    var targetRole   = staffData.role || "staff";
-
-    // Check approver has sufficient level
-    if(getRoleLevel(approverRole) <= getRoleLevel(targetRole)) {
-      showToast("⚠️ You cannot approve someone at the same or higher level as yourself");
-      return Promise.reject("Insufficient level");
-    }
-
-    if(window.firebaseAuth && window.firebaseAuth.approveStaff) {
-      return window.firebaseAuth.approveStaff(uid).then(function() {
-        // Log the approval
-        hodLog("approval",
-          "Staff approved: " + (staffData.name||uid) + " as " + getRoleLabel(targetRole) +
-          " · Approved by: " + approverName + " (" + getRoleLabel(approverRole) + ")",
-          "Staff Management"
-        );
-        showToast("✅ " + (staffData.name||"Staff") + " approved");
-      });
-    }
-    return Promise.reject("No auth module");
-  };
-
-  // Add admission lock setting to ward config in Lead Panel
-  (function(){
-    var lockSelect = document.getElementById("wardAdmissionLock");
-    if(!lockSelect) return;
-    lockSelect.onchange = function() {
-      var w = currentWard();
-      if(!w) return;
-      w.admissionLock = lockSelect.value;
-      hodLog("config", "Admission lock set to: " + lockSelect.value + " for ward: " + w.name, w.name);
-      saveState();
-      updateAdmissionLock();
-      showToast("✅ Admission lock updated for " + w.name);
-    };
-  })();
-
-
-  /* ============================================================
-     NOTIFICATION CENTRE — v1.0
-     Per-user preferences saved to account (Firebase).
-     Per-patient watch/mute from patient card.
-     In-app bell with 48h history.
-     Quiet hours opt-in. Urgent always bypasses quiet hours.
-     Dismiss vs Acknowledge (Urgent acknowledgement logged).
-  ============================================================ */
-  (function(){
-
-    // Default notification preferences
-    var DEFAULT_NOTIF_PREFS = {
-      acuityChange:     true,   // Stable→Review, Review→Urgent
-      urgentAll:        true,   // Urgent alert to all
-      admitDischarge:   false,  // Patient admitted/discharged
-      theatreUpdate:    true,   // Theatre status changes
-      handoverSigned:   true,   // Handover sign-off
-      staffApproval:    true,   // New staff needs approval
-      requireAckUrgent: true,   // Must acknowledge urgent alerts
-      quietHours:       false,  // Quiet hours enabled
-      quietFrom:        "22:00",
-      quietTo:          "07:00"
-    };
-
-    // Load prefs from localStorage (synced to Firebase per account)
-    function getNotifPrefs() {
-      var stored = localStorage.getItem("wb_notif_prefs");
-      if(stored) {
-        try { return Object.assign({}, DEFAULT_NOTIF_PREFS, JSON.parse(stored)); }
-        catch(e) {}
-      }
-      return Object.assign({}, DEFAULT_NOTIF_PREFS);
-    }
-
-    function saveNotifPrefs(prefs) {
-      localStorage.setItem("wb_notif_prefs", JSON.stringify(prefs));
-      // Sync to Firebase if available
-      if(window.firebaseSync && window.firebaseSync.saveNotifPrefs) {
-        window.firebaseSync.saveNotifPrefs(prefs);
-      }
-    }
-
-    // In-app notification history (last 48h)
-    if(!state.notifHistory) state.notifHistory = [];
-
-    function addNotifToHistory(entry) {
-      if(!state.notifHistory) state.notifHistory = [];
-      entry.id  = "n_" + Date.now().toString(36);
-      entry.at  = nowISO();
-      entry.read = false;
-      state.notifHistory.unshift(entry);
-      // Keep 48h only
-      var cutoff = Date.now() - 48 * 60 * 60 * 1000;
-      state.notifHistory = state.notifHistory.filter(function(n) {
-        return new Date(n.at).getTime() > cutoff;
-      });
-      saveState();
-      updateNotifBell();
-    }
-
-    function updateNotifBell() {
-      var bell    = document.getElementById("notifBell");
-      var badge   = document.getElementById("notifBadge");
-      var unread  = (state.notifHistory||[]).filter(function(n){ return !n.read; }).length;
-      if(badge) {
-        badge.textContent = unread > 9 ? "9+" : (unread || "");
-        badge.style.display = unread ? "" : "none";
-      }
-      if(bell) bell.title = unread ? unread + " unread notifications" : "Notifications";
-    }
-
-    function isQuietHours() {
-      var prefs = getNotifPrefs();
-      if(!prefs.quietHours) return false;
-      var now   = new Date();
-      var hm    = now.getHours() * 60 + now.getMinutes();
-      var from  = timeToMinutes(prefs.quietFrom);
-      var to    = timeToMinutes(prefs.quietTo);
-      if(from > to) return hm >= from || hm < to; // overnight
-      return hm >= from && hm < to;
-    }
-
-    function timeToMinutes(str) {
-      var parts = (str||"").split(":");
-      return parseInt(parts[0]||0) * 60 + parseInt(parts[1]||0);
-    }
-
-    function isPatientWatched(wardId, bedKey) {
-      var watches = state.patientWatches || {};
-      return !!watches[wardId + "_" + bedKey];
-    }
-
-    function isPatientMuted(wardId, bedKey) {
-      var mutes = state.patientMutes || {};
-      return !!mutes[wardId + "_" + bedKey];
-    }
-
-    // Fire a notification — checks prefs, quiet hours, mutes
-    window.fireNotif = function(type, title, body, opts) {
-      opts = opts || {};
-      var prefs = getNotifPrefs();
-      var isUrgent = type === "urgent";
-
-      // Check if this type is enabled
-      if(!isUrgent && !prefs[type]) return;
-
-      // Check mute for specific patient
-      if(opts.wardId && opts.bedKey && isPatientMuted(opts.wardId, opts.bedKey)) return;
-
-      // Quiet hours — urgent always bypasses
-      if(!isUrgent && isQuietHours()) {
-        // Queue for summary — still add to history
-        addNotifToHistory({ type: type, title: title, body: body, urgent: false, queued: true, opts: opts });
-        return;
-      }
-
-      // Add to in-app history
-      addNotifToHistory({ type: type, title: title, body: body, urgent: isUrgent, opts: opts });
-
-      // Show toast in-app
-      if(isUrgent && prefs.requireAckUrgent) {
-        showUrgentAckToast(title, body, opts);
-      } else {
-        showToast("🔔 " + title + (body ? " — " + body : ""));
-      }
-
-      // Push notification (if permission granted)
-      if(Notification.permission === "granted") {
-        try {
-          new Notification(title, { body: body, icon: "/ward-board/icon-192.png", tag: type });
-        } catch(e) {}
-      }
-    };
-
-    // Urgent acknowledgement toast — cannot dismiss without name
-    function showUrgentAckToast(title, body, opts) {
-      var existing = document.getElementById("urgentAckToast");
-      if(existing) existing.remove();
-
-      var toast = document.createElement("div");
-      toast.id = "urgentAckToast";
-      toast.style.cssText = "position:fixed;bottom:calc(80px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);background:#c0291f;color:#fff;padding:16px 20px;border-radius:14px;font-weight:600;font-size:0.88rem;z-index:9999;max-width:340px;width:calc(100% - 40px);box-shadow:0 8px 32px rgba(192,41,31,0.4);";
-      toast.innerHTML =
-        '<div style="font-size:1rem;margin-bottom:4px;">🚨 ' + escapeHtml(title) + '</div>' +
-        '<div style="font-weight:400;font-size:0.82rem;opacity:0.9;margin-bottom:12px;">' + escapeHtml(body||"") + '</div>' +
-        '<div style="display:flex;gap:8px;">' +
-        '<button id="urgentAckBtn" style="flex:1;background:#fff;color:#c0291f;border:none;border-radius:8px;padding:9px;font-weight:700;font-size:0.82rem;cursor:pointer;font-family:inherit;">✅ Acknowledge</button>' +
-        '<button id="urgentDismissBtn" style="background:rgba(255,255,255,0.2);color:#fff;border:none;border-radius:8px;padding:9px 14px;font-size:0.82rem;cursor:pointer;font-family:inherit;">View</button>' +
-        '</div>';
-      document.body.appendChild(toast);
-
-      document.getElementById("urgentAckBtn").onclick = function() {
-        var staffName = getStaffName() || "Unknown";
-        hodLog("acknowledgement", "Urgent alert acknowledged: " + title + " · by: " + staffName, opts.wardName || "");
-        toast.remove();
-        showToast("✅ Acknowledged by " + staffName);
-        // Mark as read in history
-        (state.notifHistory||[]).forEach(function(n) {
-          if(n.title === title && !n.acknowledged) {
-            n.acknowledged  = true;
-            n.acknowledgedBy = staffName;
-            n.acknowledgedAt = nowISO();
-            n.read = true;
-          }
-        });
-        saveState();
-        updateNotifBell();
-      };
-
-      document.getElementById("urgentDismissBtn").onclick = function() {
-        toast.remove();
-        openNotifPanel();
-      };
-    }
-
-    // Open notification history panel
-    function openNotifPanel() {
-      var panel = document.getElementById("notifPanelOverlay");
-      if(!panel) return;
-      renderNotifPanel();
-      panel.classList.add("show");
-    }
-
-    function renderNotifPanel() {
-      var body = document.getElementById("notifPanelBody");
-      if(!body) return;
-      var history = state.notifHistory || [];
-
-      if(!history.length) {
-        body.innerHTML = '<div style="padding:32px;text-align:center;color:var(--ink-mute);font-size:0.9rem;">No notifications in the last 48 hours.</div>';
-        return;
-      }
-
-      body.innerHTML = history.map(function(n) {
-        var color = n.urgent ? "var(--red)" : "var(--accent)";
-        var bg    = n.urgent ? "var(--red-soft)" : "var(--accent-pale)";
-        var timeStr = fmtTime ? fmtTime(n.at) : n.at;
-        return '<div style="padding:14px 18px;border-bottom:1px solid var(--line-soft);background:' + (n.read?"":"var(--accent-pale)") + '">' +
-          '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">' +
-          '<span style="font-size:0.72rem;font-weight:700;padding:2px 8px;border-radius:100px;background:' + bg + ';color:' + color + ';">' +
-          (n.urgent ? "🚨 URGENT" : "🔔 " + (n.type||"info").toUpperCase()) + '</span>' +
-          '<span style="font-size:0.75rem;color:var(--ink-mute);">' + escapeHtml(timeStr) + '</span>' +
-          (n.queued ? '<span style="font-size:0.68rem;color:var(--ink-mute);margin-left:auto;">quiet hours</span>' : '') +
-          '</div>' +
-          '<div style="font-size:0.88rem;font-weight:600;color:var(--ink);margin-bottom:2px;">' + escapeHtml(n.title||"") + '</div>' +
-          (n.body ? '<div style="font-size:0.8rem;color:var(--ink-soft);">' + escapeHtml(n.body) + '</div>' : '') +
-          (n.acknowledgedBy ? '<div style="font-size:0.72rem;color:var(--accent);margin-top:4px;">✅ Acknowledged by ' + escapeHtml(n.acknowledgedBy) + ' · ' + fmtTime(n.acknowledgedAt) + '</div>' : '') +
-          '</div>';
-      }).join("");
-
-      // Mark all as read
-      history.forEach(function(n){ n.read = true; });
-      saveState();
-      updateNotifBell();
-    }
-
-    // Notification settings panel
-    function renderNotifSettings() {
-      var body = document.getElementById("notifSettingsBody");
-      if(!body) return;
-      var prefs = getNotifPrefs();
-
-      var items = [
-        { key:"acuityChange",   label:"Acuity changes",          desc:"When a patient changes stability level" },
-        { key:"urgentAll",      label:"Urgent alerts",           desc:"When any patient is marked Urgent" },
-        { key:"admitDischarge", label:"Admissions & discharges", desc:"When a patient is added or removed" },
-        { key:"theatreUpdate",  label:"Theatre status updates",  desc:"When theatre status changes" },
-        { key:"handoverSigned", label:"Handover signed",         desc:"When a Lead signs off handover" },
-        { key:"staffApproval",  label:"Staff approval needed",   desc:"When a new staff member registers" },
-        { key:"requireAckUrgent", label:"Require acknowledgement for Urgent", desc:"Cannot dismiss Urgent alerts without your name" }
-      ];
-
-      body.innerHTML =
-        '<div style="padding:16px 18px;">' +
-        items.map(function(item) {
-          return '<div style="display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid var(--line-soft);">' +
-            '<div style="flex:1;">' +
-            '<div style="font-size:0.88rem;font-weight:600;color:var(--ink);margin-bottom:2px;">' + escapeHtml(item.label) + '</div>' +
-            '<div style="font-size:0.78rem;color:var(--ink-soft);">' + escapeHtml(item.desc) + '</div>' +
-            '</div>' +
-            '<label style="position:relative;width:44px;height:26px;flex-shrink:0;cursor:pointer;">' +
-            '<input type="checkbox" data-pref="' + item.key + '" ' + (prefs[item.key] ? "checked" : "") + ' style="opacity:0;width:0;height:0;position:absolute;" />' +
-            '<span style="position:absolute;inset:0;background:' + (prefs[item.key]?"var(--accent)":"var(--line)") + ';border-radius:13px;transition:background 0.2s;" data-toggle="' + item.key + '"></span>' +
-            '<span style="position:absolute;top:3px;left:' + (prefs[item.key]?"21px":"3px") + ';width:20px;height:20px;background:#fff;border-radius:50%;transition:left 0.2s;" data-thumb="' + item.key + '"></span>' +
-            '</label>' +
-            '</div>';
-        }).join("") +
-        '<div style="padding-top:16px;">' +
-        '<div style="font-size:0.82rem;font-weight:600;color:var(--ink);margin-bottom:12px;">🌙 Quiet hours</div>' +
-        '<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">' +
-        '<span style="font-size:0.82rem;color:var(--ink-soft);">Enable quiet hours</span>' +
-        '<label style="position:relative;width:44px;height:26px;flex-shrink:0;cursor:pointer;">' +
-        '<input type="checkbox" id="quietHoursToggle" ' + (prefs.quietHours?"checked":"") + ' style="opacity:0;width:0;height:0;position:absolute;" />' +
-        '<span id="quietHoursToggleBg" style="position:absolute;inset:0;background:' + (prefs.quietHours?"var(--accent)":"var(--line)") + ';border-radius:13px;" />' +
-        '<span id="quietHoursThumb" style="position:absolute;top:3px;left:' + (prefs.quietHours?"21px":"3px") + ';width:20px;height:20px;background:#fff;border-radius:50%;transition:left 0.2s;" />' +
-        '</label></div>' +
-        '<div style="display:flex;gap:12px;align-items:center;">' +
-        '<label style="font-size:0.8rem;color:var(--ink-soft);">From</label>' +
-        '<input type="time" id="quietFrom" value="' + prefs.quietFrom + '" style="width:120px;" />' +
-        '<label style="font-size:0.8rem;color:var(--ink-soft);">To</label>' +
-        '<input type="time" id="quietTo" value="' + prefs.quietTo + '" style="width:120px;" />' +
-        '</div>' +
-        '<p style="font-size:0.75rem;color:var(--ink-mute);margin-top:8px;">Urgent alerts always come through during quiet hours regardless of this setting.</p>' +
-        '</div>' +
-        '</div>';
-
-      // Wire toggles
-      body.querySelectorAll("input[data-pref]").forEach(function(inp) {
-        inp.onchange = function() {
-          var key = inp.getAttribute("data-pref");
-          prefs[key] = inp.checked;
-          var bg    = body.querySelector('[data-toggle="' + key + '"]');
-          var thumb = body.querySelector('[data-thumb="' + key + '"]');
-          if(bg)    bg.style.background = inp.checked ? "var(--accent)" : "var(--line)";
-          if(thumb) thumb.style.left    = inp.checked ? "21px" : "3px";
-          saveNotifPrefs(prefs);
-        };
-      });
-
-      var qtToggle = document.getElementById("quietHoursToggle");
-      if(qtToggle) qtToggle.onchange = function() {
-        prefs.quietHours = qtToggle.checked;
-        var bg    = document.getElementById("quietHoursToggleBg");
-        var thumb = document.getElementById("quietHoursThumb");
-        if(bg)    bg.style.background = qtToggle.checked ? "var(--accent)" : "var(--line)";
-        if(thumb) thumb.style.left    = qtToggle.checked ? "21px" : "3px";
-        saveNotifPrefs(prefs);
-      };
-
-      ["quietFrom","quietTo"].forEach(function(id) {
-        var el = document.getElementById(id);
-        if(el) el.onchange = function() {
-          prefs[id] = el.value;
-          saveNotifPrefs(prefs);
-        };
-      });
-    }
-
-    // Bell button
-    var bell = document.getElementById("notifBell");
-    if(bell) bell.onclick = openNotifPanel;
-
-    // Close buttons
-    var closeNotif = document.getElementById("closeNotifPanel");
-    if(closeNotif) closeNotif.onclick = function() {
-      document.getElementById("notifPanelOverlay").classList.remove("show");
-    };
-
-    var notifSettingsBtn = document.getElementById("notifSettingsBtn");
-    if(notifSettingsBtn) notifSettingsBtn.onclick = function() {
-      document.getElementById("notifPanelOverlay").classList.remove("show");
-      var settingsOv = document.getElementById("notifSettingsOverlay");
-      if(settingsOv) { renderNotifSettings(); settingsOv.classList.add("show"); }
-    };
-
-    var closeNotifSettings = document.getElementById("closeNotifSettings");
-    if(closeNotifSettings) closeNotifSettings.onclick = function() {
-      document.getElementById("notifSettingsOverlay").classList.remove("show");
-    };
-
-    // Per-patient watch/mute buttons (called from patient card more menu)
-    window.togglePatientWatch = function(wardId, bedKey) {
-      if(!state.patientWatches) state.patientWatches = {};
-      var key = wardId + "_" + bedKey;
-      state.patientWatches[key] = !state.patientWatches[key];
-      saveState();
-      showToast(state.patientWatches[key] ? "🔔 Watching this patient" : "🔕 Stopped watching");
-    };
-
-    window.togglePatientMute = function(wardId, bedKey) {
-      if(!state.patientMutes) state.patientMutes = {};
-      var key = wardId + "_" + bedKey;
-      state.patientMutes[key] = !state.patientMutes[key];
-      saveState();
-      showToast(state.patientMutes[key] ? "🔕 Patient notifications muted" : "🔔 Patient notifications unmuted");
-    };
-
-    // Fire notification on acuity change — hook into saveState
-    var _origSaveState = window.saveState || saveState;
-    window.saveStateWithNotif = function() {
-      _origSaveState();
-    };
-
-    updateNotifBell();
-
-  })(); // end notification centre
-
-
-  /* ============================================================
-     MOBILE UX IMPROVEMENTS — v3.0
-     1. minmax fixed to 280px (from 310px) — no overflow on phones
-     2. Collapsible filter toolbar on mobile
-     3. Bottom navigation bar
-     4. 44px minimum tap targets
-     5. Bottom sheet modals on mobile
-     6. Compact list view auto on mobile
-  ============================================================ */
-  (function(){
-
-    // 1. Bottom navigation — mobile only
-    var bottomNav = document.getElementById("mobileBottomNav");
-    if(bottomNav) {
-      var navItems = bottomNav.querySelectorAll(".mobile-nav-item");
-      navItems.forEach(function(item) {
-        item.onclick = function() {
-          var target = item.getAttribute("data-target");
-          navItems.forEach(function(n){ n.classList.remove("active"); });
-          item.classList.add("active");
-
-          if(target === "board") {
-            // already on board — scroll to top
-            window.scrollTo({top:0, behavior:"smooth"});
-          } else if(target === "theatre") {
-            var btn = document.getElementById("theatreListBtn");
-            if(btn) btn.click();
-          } else if(target === "handover") {
-            var hbtn = document.getElementById("exportSummaryBtn");
-            if(hbtn) hbtn.click();
-          } else if(target === "notif") {
-            var nbtn = document.getElementById("notifBell");
-            if(nbtn) nbtn.click();
-          } else if(target === "profile") {
-            var pbtn = document.getElementById("staffNameBtn");
-            if(pbtn) pbtn.click();
-          }
-        };
-      });
-    }
-
-    // 2. Collapsible filter toolbar on mobile
-    var filterToggle = document.getElementById("mobileFilterToggle");
-    var filterRow    = document.querySelector(".filter-row");
-    if(filterToggle && filterRow) {
-      var filterVisible = false;
-      // Hide filter row on mobile by default
-      if(window.innerWidth < 640) {
-        filterRow.style.display = "none";
-      }
-      filterToggle.onclick = function() {
-        filterVisible = !filterVisible;
-        filterRow.style.display = filterVisible ? "" : "none";
-        filterToggle.style.background = filterVisible ? "var(--accent-soft)" : "";
-        filterToggle.style.color = filterVisible ? "var(--accent)" : "";
-      };
-    }
-
-    // 3. Bottom sheet modals on mobile
-    function makeBottomSheet(overlayId) {
-      var overlay = document.getElementById(overlayId);
-      if(!overlay) return;
-      var modal = overlay.querySelector(".modal");
-      if(!modal) return;
-
-      if(window.innerWidth < 640) {
-        overlay.style.alignItems = "flex-end";
-        modal.style.borderRadius = "20px 20px 0 0";
-        modal.style.maxHeight    = "92vh";
-        modal.style.width        = "100%";
-        modal.style.maxWidth     = "100%";
-        modal.style.marginBottom = "0";
-
-        // Swipe to dismiss
-        var startY = 0;
-        modal.addEventListener("touchstart", function(e) {
-          startY = e.touches[0].clientY;
-        }, {passive:true});
-        modal.addEventListener("touchend", function(e) {
-          var delta = e.changedTouches[0].clientY - startY;
-          if(delta > 100) overlay.classList.remove("show");
-        }, {passive:true});
-      }
-    }
-
-    // Apply bottom sheet to key modals
-    ["patientOverlay","handoverOverlay","theatreOverlay","signoffOverlay","qrOverlay"].forEach(makeBottomSheet);
-
-    // 4. Compact list view on small screens — triggered by view toggle
-    var listViewBtn = document.getElementById("listViewBtn");
-    var gridViewBtn = document.getElementById("gridViewBtn");
-    var grid        = document.getElementById("grid");
-
-    function setListView(on) {
-      if(!grid) return;
-      if(on) {
-        grid.classList.add("list-view");
-        localStorage.setItem("wb_list_view", "1");
-        if(listViewBtn) { listViewBtn.style.background="var(--accent-soft)"; listViewBtn.style.color="var(--accent)"; }
-        if(gridViewBtn) { gridViewBtn.style.background=""; gridViewBtn.style.color=""; }
-      } else {
-        grid.classList.remove("list-view");
-        localStorage.setItem("wb_list_view", "0");
-        if(listViewBtn) { listViewBtn.style.background=""; listViewBtn.style.color=""; }
-        if(gridViewBtn) { gridViewBtn.style.background="var(--accent-soft)"; gridViewBtn.style.color="var(--accent)"; }
-      }
-    }
-
-    if(listViewBtn) listViewBtn.onclick = function(){ setListView(true); };
-    if(gridViewBtn) gridViewBtn.onclick = function(){ setListView(false); };
-
-    // Auto-list on small screens
-    if(window.innerWidth < 500) {
-      setListView(true);
-    } else if(localStorage.getItem("wb_list_view") === "1") {
-      setListView(true);
-    }
-
-  })(); // end mobile improvements
 
 
 })(); // end main IIFE
