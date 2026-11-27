@@ -2183,15 +2183,17 @@
   });
 
   function openPatientModal(room, bed, patient){
+    try {
     currentBedForModal = {room:room, bed:bed};
-    document.getElementById("modalTitle").textContent = room + bed + (patient ? " — Edit" : " — New Patient");
+    var _modalTitle = document.getElementById("modalTitle");
+    if(_modalTitle) _modalTitle.textContent = room + bed + (patient ? " — Edit" : " — New Patient");
     setTypeUI(patient ? patient.type : "antenatal");
     setAcuityUI(patient ? patient.acuity : "stable");
 
     var chk = patient && patient.checklist ? patient.checklist : {};
-    document.getElementById("chk_vte").checked = !!chk.vte;
-    document.getElementById("chk_edd").checked = !!chk.edd;
-    document.getElementById("chk_consult").checked = !!chk.consult;
+    var _chkVte = document.getElementById("chk_vte"); if(_chkVte) _chkVte.checked = !!chk.vte;
+    var _chkEdd = document.getElementById("chk_edd"); if(_chkEdd) _chkEdd.checked = !!chk.edd;
+    var _chkCon = document.getElementById("chk_consult"); if(_chkCon) _chkCon.checked = !!chk.consult;
 
     function setVal(id, v){ var el = document.getElementById(id); if(el) el.value = v || ""; }
     setVal("f_name", patient ? patient.name : "");
@@ -2267,6 +2269,11 @@
     setVal("f_labs_general", patient ? patient.labs : "");
 
     if(patientOverlay) patientOverlay.classList.add("show");
+    } catch(e) {
+      console.error("[openPatientModal] Error:", e.message, e.stack);
+      // Show the modal anyway so user isn't left with a broken screen
+      if(patientOverlay) patientOverlay.classList.add("show");
+    }
   }
 
   function closePatientModal(){
@@ -2682,7 +2689,11 @@
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
       var tEl = document.getElementById("appTitle");
       if(tEl && state.appTitle) tEl.textContent = state.appTitle;
-      render();
+      // Don't re-render while a modal is open — it would clear the grid behind the modal
+      var anyModalOpen = document.querySelector(".overlay.show");
+      if(!anyModalOpen) {
+        render();
+      }
       isRemoteUpdate = false;
     } else {
       // Cloud DB is empty — push initial state up to the cloud
