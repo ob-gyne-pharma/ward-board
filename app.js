@@ -1749,7 +1749,7 @@
             if(hay.indexOf(query) === -1) return;
           }
         } else {
-          if(unitQ || typeQ || activeAcuityFilter) return;
+          // Empty beds — always show unless there's a text search that doesn't match
           if(query && (room+bed).toLowerCase().indexOf(query)===-1) return;
         }
         anyVisible = true;
@@ -3925,6 +3925,9 @@
   loadState();
   if(getStaffName() && staffBtn){ staffBtn.textContent = "👤 " + getStaffName(); }
   updateNotifStatus();
+  // Clear search box on load — browser may autofill with email from auth form
+  var _sb = document.getElementById("searchBox");
+  if(_sb) _sb.value = "";
   render();
 
   /* ============================================================
