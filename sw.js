@@ -2,7 +2,7 @@
    Service Worker: offline cache + background sync
 */
 
-const CACHE_NAME = 'ward-board-v2.0';
+const CACHE_NAME = 'ward-board-v2.9';
 const STATIC_ASSETS = [
   './',
   './index.html',
