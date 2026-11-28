@@ -1025,15 +1025,34 @@
   /* Watch for pending staff in real time — updates badge on Lead button */
   setTimeout(function(){
     if(window.firebaseAuth && window.firebaseAuth.watchPendingStaff){
+      var _lastPendingCount = 0;
       window.firebaseAuth.watchPendingStaff(function(count){
         var badge = document.getElementById("pendingBadge");
         if(badge){
-          badge.textContent = count+" pending";
+          badge.textContent = count + " pending";
           badge.style.display = count > 0 ? "inline" : "none";
         }
-        // Also update Lead button to show notification
+        // Update Lead button
         var hodBtn = document.getElementById("hodBtn");
-        if(hodBtn) hodBtn.textContent = count > 0 ? "🔑 Lead 🔴" : "🔑 Lead";
+        if(hodBtn) hodBtn.style.outline = count > 0 ? "2px solid var(--red)" : "";
+
+        // Toast alert when count increases
+        if(count > _lastPendingCount && _lastPendingCount >= 0) {
+          var newReqs = count - _lastPendingCount;
+          showToast("🔔 " + newReqs + " new staff request" + (newReqs > 1 ? "s" : "") + " awaiting approval — open Lead Panel");
+          // Push notification if permission granted
+          if(Notification.permission === "granted") {
+            try {
+              new Notification("Ward Board — Staff request", {
+                body: newReqs + " new staff member" + (newReqs > 1 ? "s" : "") + " waiting for approval",
+                icon: "./icons/icon-192.png",
+                tag: "staff-approval"
+              });
+            } catch(e) {}
+          }
+          hodLog("staffRequest", newReqs + " new staff approval request(s)", "Staff");
+        }
+        _lastPendingCount = count;
       });
     }
   }, 3000); // wait for auth to initialise
@@ -3925,9 +3944,18 @@
   loadState();
   if(getStaffName() && staffBtn){ staffBtn.textContent = "👤 " + getStaffName(); }
   updateNotifStatus();
-  // Clear search box on load — browser may autofill with email from auth form
-  var _sb = document.getElementById("searchBox");
-  if(_sb) _sb.value = "";
+  // Clear search box — browsers (Edge/Chrome) may autofill with email
+  // Clear immediately and again after delays to override browser autofill
+  function clearSearchBox() {
+    var _sb = document.getElementById("searchBox");
+    if(_sb && _sb.value && _sb.value.indexOf("@") !== -1) {
+      _sb.value = "";
+      render();
+    }
+  }
+  clearSearchBox();
+  setTimeout(clearSearchBox, 500);
+  setTimeout(clearSearchBox, 1500);
   render();
 
   /* ============================================================
